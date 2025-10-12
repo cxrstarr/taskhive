@@ -1,0 +1,223 @@
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #fffef2;
+}
+.hero {
+    background: linear-gradient(135deg, #ffc107, #ff9800);
+    color: #333;
+    padding: 100px 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+.hero::before {
+    content: '🐝';
+    font-size: 4rem;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    opacity: 0.2;
+}
+.hero::after {
+    content: '🐝';
+    font-size: 4rem;
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    opacity: 0.2;
+}
+.hero h1 {
+    font-size: 3rem;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+.hero p {
+    font-size: 1.5rem;
+}
+.services {
+    padding: 60px 0;
+    background-color: #fffef2;
+}
+.services .card {
+    border: 2px solid #ffc107;
+    border-radius: 10px;
+    transition: transform 0.3s;
+}
+.services .card:hover {
+    transform: scale(1.05);
+}
+
+.freelancers {
+    background-color: #fac721; /* Soft yellow for freelance section */
+    padding: 60px 0;
+}
+
+.how-it-works {
+    padding: 60px 0;
+    background-color: #f8f0d6;
+}
+.how-it-works .card {
+    background-color: #ffc107;
+    color: #333;
+    border: 2px solid #333;
+    border-radius: 10px;
+    padding: 20px;
+}
+.how-it-works .card h4 {
+    color: #333;
+}
+.monetization {
+    padding: 60px 0;
+    background-color: #fffef2;
+}
+
+/* ...existing code... */
+
+.contact-us {
+  padding: 80px 0;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  overflow: hidden; /* Ensure the pseudo-element doesn't overflow */
+}
+
+/* Blurred background image for Contact Us */
+.contact-us::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: url("img/hivebg.jpg") center/cover no-repeat;
+  filter: blur(8px);
+  z-index: 0;
+  opacity: 0.8;
+}
+
+/* Ensure the card and content are above the blurred bg */
+.contact-card {
+  position: relative;
+  z-index: 1;
+  background: rgba(255,255,255,0.9);
+  border-radius: 16px;
+  padding: 40px;
+  max-width: 600px;
+  margin: auto;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+/* ...existing code... */
+
+.contact-card h2 {
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.contact-card p {
+  color: #555;
+  margin-bottom: 30px;
+}
+
+.contact-card input,
+.contact-card textarea {
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.contact-card .btn-hive {
+  padding: 12px 30px;
+  font-weight: bold;
+  border-radius: 8px;
+}
+
+
+
+.cta {
+    padding: 60px 0;
+    text-align: center;
+    background: #ffa726;
+    color: #333;
+}
+.footer {
+    padding: 20px 0;
+    background-color: #333;
+    color: #fffef2;
+    text-align: center;
+}
+.navbar {
+    background-color: #333 !important;
+}
+.navbar-brand, .nav-link {
+    color: #ffc107 !important;
+}
+.nav-link:hover {
+    color: #ffca28 !important;
+}
+.btn-hive {
+    background-color: #ffca28;
+    color: #333;
+    border: none;
+}
+.btn-hive:hover {
+    background-color: #aa6908;
+}
+
+.nav-link.dropdown-toggle {
+    background-color: #ffca28;
+    color: #333 !important;
+    border-radius: 5px;
+    padding: 8px 16px;
+    margin-left: 10px;
+}
+.nav-link.dropdown-toggle:hover {
+    background-color: #ffa726;
+    color: #333 !important;
+}
+
+/* Custom Dropdown */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  margin-top: 5px;
+  background: #fffef2;
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  min-width: 150px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  z-index: 1000;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-menu a {
+  display: block;
+  padding: 10px 15px;
+  color: #333;
+  text-decoration: none;
+}
+
+.dropdown-menu a:hover {
+  background: #ffecb3;
+}
+
+.reviews {
+  background-color: #f0e564;
+}
+
+.reviews .card {
+  border-radius: 12px;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.reviews .card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+}

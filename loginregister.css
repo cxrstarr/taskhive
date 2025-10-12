@@ -1,0 +1,289 @@
+.login-section {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  overflow: hidden; /* prevent pseudo element overflow */
+}
+
+.login-section::before {
+  content: "";
+  position: absolute;
+  inset: 0; /* full cover */
+  background: url("img/hive.jpg") center/cover no-repeat;
+  filter: blur(8px); /* adjust blur level */
+  z-index: -1; /* place behind content */
+  transform: scale(1.1); /* prevents edge cut-off from blur */
+}
+
+
+.login-card {
+  border: 2px solid #ffc107;
+  border-radius: 12px;
+  padding: 30px;
+  background: #ffffff;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-card h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.login-card a {
+  color: #ff9800;
+  text-decoration: none;
+}
+
+.login-card a:hover {
+  text-decoration: underline;
+}
+
+
+.btn-hive {
+  background-color: #ffca28; /* honey yellow */
+  color: #333;
+  border: none;
+  font-weight: bold;
+  padding: 10px 0;
+  border-radius: 6px;
+  transition: background-color 0.3s ease;
+}
+
+.btn-hive:hover {
+  background-color: #ffa726; /* darker honey */
+  color: #fff;
+}
+
+
+/* Background with subtle honey style */
+.register-section {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: url("img/hive.jpg") center/cover no-repeat fixed;
+}
+
+/* Yellow Main Card */
+.register-card {
+  border: 2px solid #ffc107;
+  border-radius: 16px;
+  padding: 40px;
+  background: #fce878; /* honey yellow */
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 1000px;
+  text-align: center;
+}
+
+/* Title */
+.title-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+.title-h2 {
+  color: #333;
+  font-weight: bold;
+  font-size: 1.8rem;
+}
+.bee-icon {
+  font-size: 1.6rem;
+}
+
+/* Choice Cards */
+.choice-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+  height: 100%;
+}
+.choice-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+
+.choice-icon {
+  font-size: 40px;
+  margin-bottom: 15px;
+  color: #ff9800; /* matches site theme */
+}
+.choice-title {
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #333;
+}
+.choice-desc {
+  font-size: 0.95rem;
+  margin-bottom: 15px;
+  color: #555;
+}
+.choice-list {
+  text-align: left;
+  margin-bottom: 20px;
+  padding-left: 20px;
+}
+.choice-list li {
+  margin-bottom: 6px;
+  color: #444;
+}
+
+/* Hive Buttons (same as navbar theme) */
+.btn-hive {
+  background: #ffca28;
+  border: none;
+  color: #333;
+  font-weight: bold;
+  border-radius: 8px;
+  transition: background 0.3s ease;
+  padding: 10px 20px;
+}
+.btn-hive:hover {
+  background: #ffa726;
+  color: #fff;
+}
+
+
+
+/* General Page Styling */
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: url("images/bg-pattern.jpg") no-repeat center center/cover;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Overlay effect */
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.85); /* soft overlay */
+  backdrop-filter: blur(4px);
+  z-index: 0;
+}
+
+/* Register Section */
+.register-section {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+/* Main card */
+.register-card {
+  background: #fff;
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  max-width: 1000px;
+  width: 100%;
+}
+
+/* Title */
+.register-card h2 {
+  font-weight: 700;
+  color: #333;
+  font-size: 1.8rem;
+}
+
+/* Choices wrapper */
+.choice-wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 30px;
+  margin-top: 30px;
+}
+
+/* Individual choice card */
+.choice-card {
+  background: #fafafa;
+  border-radius: 16px;
+  padding: 25px;
+  text-align: center;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.choice-card:hover {
+  background: #fffbee;
+  border: 2px solid #ffc107;
+  transform: translateY(-8px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+/* Icon */
+.choice-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+/* Title */
+.choice-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+/* Description */
+.choice-desc {
+  font-size: 0.95rem;
+  color: #666;
+  margin-bottom: 15px;
+}
+
+/* Feature list */
+.choice-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.choice-list li {
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+}
+
+.choice-list li::before {
+  content: "✔";
+  color: #28a745;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+
+/* Login text */
+.register-section p {
+  margin-top: 20px;
+  color: #444;
+}
+.register-section a {
+  color: #ffc107;
+  font-weight: 600;
+  text-decoration: none;
+}
+.register-section a:hover {
+  text-decoration: underline;
+}

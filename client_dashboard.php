@@ -1,0 +1,734 @@
+<?php
+session_start();
+require_once 'database.php';
+require_once 'flash.php';
+
+// Require logged-in client
+if (empty($_SESSION['user_id']) || (($_SESSION['user_type'] ?? '') !== 'client')) {
+    flash_set('error','You must be logged in as a client.');
+    header('Location: login.php');
+    exit;
+}
+
+$db        = new database();
+$client_id = (int)$_SESSION['user_id'];
+// Pagination params
+$bookingsPerPage = 8; // compact list to match card width
+$reviewsPerPage  = 6;
+$bp = max(1, (int)($_GET['bp'] ?? 1)); // bookings page
+$rp = max(1, (int)($_GET['rp'] ?? 1)); // reviews page
+$boff = ($bp - 1) * $bookingsPerPage;
+$roff = ($rp - 1) * $reviewsPerPage;
+// Inline profile update handling
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['profile_update'])) {
+    $first = trim($_POST['first_name'] ?? '');
+    $last  = trim($_POST['last_name'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $bio   = trim($_POST['bio'] ?? '');
+
+    $fields = [];
+    $fields['first_name'] = $first;
+    $fields['last_name']  = $last;
+    $fields['phone']      = $phone;
+    $fields['bio']        = $bio;
+
+    // Optional profile picture upload
+    if (!empty($_FILES['profile_picture']) && is_array($_FILES['profile_picture']) && ($_FILES['profile_picture']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+        $tmp  = $_FILES['profile_picture']['tmp_name'];
+        $size = (int)($_FILES['profile_picture']['size'] ?? 0);
+        // Validate size (<= 2MB)
+        if ($size > 0 && $size <= 2 * 1024 * 1024) {
+            $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : null;
+            $mime  = $finfo ? finfo_file($finfo, $tmp) : null;
+            if ($finfo) finfo_close($finfo);
+            $allowed = [
+                'image/jpeg' => 'jpg',
+                'image/png'  => 'png',
+                'image/webp' => 'webp'
+            ];
+            if ($mime && isset($allowed[$mime])) {
+                $ext = $allowed[$mime];
+                $name = 'profile_'.uniqid().'.'.$ext;
+                $uploadDir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
+                if (!is_dir($uploadDir)) { @mkdir($uploadDir, 0777, true); }
+                $dest = $uploadDir.$name;
+                if (@move_uploaded_file($tmp, $dest)) {
+                    $webPath = 'uploads/'.$name;
+                    $fields['profile_picture'] = $webPath;
+                } else {
+                    flash_set('error','Failed to upload profile picture.');
+                }
+            } else {
+                flash_set('error','Invalid image type. Please upload JPG, PNG, or WEBP.');
+            }
+        } else {
+            flash_set('error','Image too large. Max size is 2MB.');
+        }
+    }
+
+    $ok = $db->updateUserProfile($client_id, $fields);
+    if ($ok) {
+        flash_set('success','Profile updated successfully.');
+    } else {
+        flash_set('error','Could not update profile.');
+    }
+    header('Location: client_dashboard.php');
+    exit;
+}
+$cp        = $db->getClientProfile($client_id);
+if (!$cp) {
+    flash_set('error','Client profile not found.');
+    header('Location: feed.php');
+    exit;
+}
+
+$displayName = trim(($cp['first_name'] ?? '').' '.($cp['last_name'] ?? '')) ?: 'Client';
+$avatar = $cp['profile_picture'] ?? '';
+if (!$avatar) {
+    $seed = urlencode($displayName ?: ('user'.$client_id));
+    $avatar = "https://api.dicebear.com/7.x/avataaars/svg?seed={$seed}";
+}
+
+$client = [
+    'id' => $cp['user_id'],
+    'name' => $displayName,
+    'email' => $cp['email'] ?? '',
+    'bio' => $cp['bio'] ?? 'No bio yet.',
+    'phone' => $cp['phone'] ?? '',
+    'profile_picture' => $avatar,
+];
+
+// Stats
+$pdo = $db->opencon();
+$totalBookings = (int)$pdo->query("SELECT COUNT(*) FROM bookings WHERE client_id=".(int)$client_id)->fetchColumn();
+$activeBookings = (int)$pdo->query("SELECT COUNT(*) FROM bookings WHERE client_id=".(int)$client_id." AND status IN ('pending','accepted','in_progress','delivered')")->fetchColumn();
+$completedBookings = (int)$pdo->query("SELECT COUNT(*) FROM bookings WHERE client_id=".(int)$client_id." AND status='completed'")->fetchColumn();
+$st = $pdo->prepare("SELECT COUNT(*)
+                     FROM bookings b
+                     WHERE b.client_id=? AND b.status='completed'
+                       AND NOT EXISTS (
+                          SELECT 1 FROM reviews r
+                          WHERE r.booking_id=b.booking_id AND r.reviewer_id=?
+                       )");
+$st->execute([$client_id,$client_id]);
+$pendingReviews = (int)$st->fetchColumn();
+$stats = [
+    'total_bookings' => $totalBookings,
+    'active_bookings' => $activeBookings,
+    'completed_bookings' => $completedBookings,
+    'pending_reviews' => $pendingReviews,
+];
+
+// Bookings (paginated)
+$rows = $db->listClientBookings($client_id, $bookingsPerPage, $boff);
+$bookings = array_map(function($b){
+    $freelancerName = $b['freelancer_name'] ?? 'Freelancer';
+    $statusMap = [
+        'completed' => 'Completed',
+        'cancelled' => 'Cancel',
+        'pending' => 'Pending',
+        'accepted' => 'Pending',
+        'in_progress' => 'Pending',
+        'delivered' => 'Pending',
+        'rejected' => 'Cancel',
+    ];
+    $raw = strtolower($b['status'] ?? 'pending');
+    $status = $statusMap[$raw] ?? 'Pending';
+    // Prefer real freelancer picture when available
+    $pic = trim($b['freelancer_picture'] ?? '');
+    if ($pic) {
+        if (preg_match('#^https?://#i', $pic)) {
+            $avatar = $pic; // full URL
+        } else {
+            // Normalize Windows absolute path or other absolute FS paths to web path
+            $base = basename(str_replace(['\\','/'], DIRECTORY_SEPARATOR, $pic));
+            // If already looks like an uploads path, keep it
+            if (preg_match('#^/?uploads/#i', $pic)) {
+                $avatar = ltrim($pic, '/');
+            } else {
+                $avatar = 'uploads/'.$base;
+            }
+        }
+    } else {
+        $avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed='.urlencode($freelancerName);
+    }
+    return [
+        'id' => (int)$b['booking_id'],
+        'service_name' => $b['service_title'] ?? 'Service',
+        'freelancer_name' => $freelancerName,
+        'freelancer_avatar' => $avatar,
+        'status' => $status,
+        'raw_status' => $raw,
+        'total' => (float)($b['total_amount'] ?? 0),
+        'created_at' => $b['created_at'] ?? '',
+        'has_review' => false,
+    ];
+}, $rows ?: []);
+
+// Mark bookings that already have a review from this client
+if ($bookings) {
+    $ids = array_column($bookings,'id');
+    $in  = implode(',', array_fill(0,count($ids),'?'));
+    $st2 = $pdo->prepare("SELECT booking_id FROM reviews WHERE reviewer_id=? AND booking_id IN ($in)");
+    $st2->execute(array_merge([$client_id], $ids));
+    $done = $st2->fetchAll(PDO::FETCH_COLUMN,0);
+    $doneSet = array_flip(array_map('intval',$done));
+    foreach ($bookings as &$bk) { $bk['has_review'] = isset($doneSet[$bk['id']]); }
+    unset($bk);
+}
+
+// Reviews written by client (paginated)
+$written = $db->listClientWrittenReviews($client_id, $reviewsPerPage, $roff);
+$stCnt = $pdo->prepare("SELECT COUNT(*) FROM reviews WHERE reviewer_id=?");
+$stCnt->execute([$client_id]);
+$totalWritten = (int)$stCnt->fetchColumn();
+
+// Total pages
+$bookingsTotalPages = max(1, (int)ceil($totalBookings / $bookingsPerPage));
+$reviewsTotalPages  = max(1, (int)ceil($totalWritten / $reviewsPerPage));
+$reviews_written = array_map(function($r){
+    $name = $r['reviewee_name'] ?? 'Freelancer';
+    $pic  = trim($r['reviewee_picture'] ?? '');
+    if ($pic) {
+        if (preg_match('#^https?://#i', $pic)) {
+            $avatar = $pic;
+        } else {
+            $base = basename(str_replace(['\\','/'], DIRECTORY_SEPARATOR, $pic));
+            if (preg_match('#^/?uploads/#i', $pic)) {
+                $avatar = ltrim($pic, '/');
+            } else {
+                $avatar = 'uploads/'.$base;
+            }
+        }
+    } else {
+        $avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed='.urlencode($name);
+    }
+    return [
+        'id' => (int)$r['review_id'],
+        'freelancer_name' => $name,
+        'freelancer_avatar' => $avatar,
+        'service_name' => $r['service_name'] ?? '',
+        'rating' => (int)($r['rating'] ?? 5),
+        'comment' => $r['comment'] ?? '',
+        'created_at' => $r['created_at'] ?? '',
+    ];
+}, $written ?: []);
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BeeHive Client Dashboard - <?php echo htmlspecialchars($client['name']); ?></title>
+        <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <style>
+            /* Minimal modal + rating styles to ensure the Review popup works */
+            .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+            .modal.open { display: flex; }
+            .modal-content { width: 100%; max-width: 620px; background: #fff; border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.25); overflow: hidden; }
+            .modal-review { padding: 20px; }
+            .modal-header-review { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #f0f0f0; padding-bottom: 12px; }
+            .modal-header-icon { width: 44px; height: 44px; background: #fff7d6; color: #f59e0b; display: grid; place-items: center; border-radius: 50%; font-size: 18px; }
+            .modal-close { margin-left: auto; background: transparent; border: none; cursor: pointer; color: #666; font-size: 18px; }
+            .review-modal-info { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; padding: 14px 0; }
+            .review-modal-service .info-label { font-weight: 600; color: #555; margin-right: 6px; }
+            .review-modal-freelancer { display: flex; align-items: center; gap: 12px; }
+            .modal-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #fafafa; }
+            .info-value, .info-value-block { font-weight: 600; color: #222; }
+            .form-group-modal { margin: 14px 0; }
+            .star-rating-container { display: flex; align-items: center; gap: 10px; }
+            .star-rating .fa-star { font-size: 24px; color: #d7d7d7; cursor: pointer; transition: color .15s ease; }
+            .star-rating .fa-star.star-filled { color: #f5b301; }
+            .rating-description { color: #666; font-size: 14px; }
+            .review-textarea { width: 100%; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; resize: vertical; min-height: 120px; outline: none; }
+            .review-textarea:focus { border-color: #f5b301; box-shadow: 0 0 0 3px rgba(245,179,1,0.15); }
+            .char-count { display: block; margin-top: 6px; font-size: 12px; color: #888; text-align: right; }
+            .modal-footer-review { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+            .btn-cancel { background: #f3f4f6; color: #333; border: 1px solid #e5e7eb; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+            .btn-cancel:hover { background: #e5e7eb; }
+            .btn-submit-review { background: #f5b301; color: #111; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+            .btn-submit-review:hover { background: #e0a400; }
+            .text-muted { color: #8b8b8b; }
+            .btn-sm.btn-warning { background: #f59e0b; color: #111; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+            .btn-sm.btn-warning:hover { background: #d98706; }
+            /* Inline profile edit toggles */
+            .edit-only { display: none; }
+            .profile-card.editing .edit-only { display: block; }
+            .profile-card.editing .view-only { display: none; }
+            .profile-edit-input, .profile-edit-textarea {
+                width: 100%; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; outline: none;
+            }
+            .profile-edit-input:focus, .profile-edit-textarea:focus { border-color: #f5b301; box-shadow: 0 0 0 3px rgba(245,179,1,0.15); }
+            .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+            /* Show actions as flex only when editing */
+            .profile-card.editing .edit-actions { display: flex; gap: 8px; }
+            /* Ensure inputs are interactable in edit mode */
+            .profile-card.editing .profile-edit-input,
+            .profile-card.editing .profile-edit-textarea { pointer-events: auto; opacity: 1; }
+
+            /* Pagination styles */
+            .pagination {
+                display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 12px;
+            }
+            .pagination .page-btn, .pagination .page-num {
+                background: #fff7d6; color: #92400E; border: 1px solid #FCD34D; padding: 6px 12px; border-radius: 9999px; text-decoration: none; font-size: 0.875rem; display: inline-flex; align-items: center; gap: 6px; transition: all .2s ease;
+            }
+            .pagination .page-btn:hover, .pagination .page-num:hover { background: #FCD34D; transform: translateY(-1px); }
+            .pagination .page-num.active { background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%); color: #111; border-color: transparent; font-weight: 700; }
+            .pagination .disabled { opacity: .5; pointer-events: none; }
+        </style>
+</head>
+<body class="honeycomb-bg">
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo">
+                        <span class="bee-icon">🐝</span>
+                    </div>
+                    <h1>BeeHive Client Dashboard</h1>
+                </div>
+                <button class="btn-outline" onclick="window.location.href='feed.php'">
+                    Back to Feed
+                </button>
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- Sidebar - Profile -->
+            <aside class="sidebar">
+                <form class="profile-card" id="profileCard" method="POST" action="client_dashboard.php" enctype="multipart/form-data">
+                    <input type="hidden" name="profile_update" value="1">
+                    <div class="profile-header">
+                    <img src="<?php echo htmlspecialchars($client['profile_picture']); ?>" 
+                        alt="<?php echo htmlspecialchars($client['name']); ?>" 
+                        class="profile-avatar" data-orig-src="<?php echo htmlspecialchars($client['profile_picture']); ?>">
+                        
+                        <h2 class="view-only"><?php echo htmlspecialchars($client['name']); ?></h2>
+                        <div class="edit-only name-row">
+                            <input type="text" name="first_name" class="profile-edit-input" placeholder="First name" value="<?php echo htmlspecialchars($cp['first_name'] ?? ''); ?>" disabled>
+                            <input type="text" name="last_name" class="profile-edit-input" placeholder="Last name" value="<?php echo htmlspecialchars($cp['last_name'] ?? ''); ?>" disabled>
+                        </div>
+                        
+                        <div class="profile-email">
+                            <i class="fas fa-envelope"></i>
+                            <span><?php echo htmlspecialchars($client['email']); ?></span>
+                        </div>
+                        <div class="edit-only" style="margin-top:8px;">
+                            <label style="font-size:12px; color:#666; display:block; margin-bottom:6px;">Change profile picture</label>
+                            <input type="file" name="profile_picture" accept="image/*" class="profile-edit-input" disabled onchange="previewProfileImage(event)">
+                            <small style="color:#888;">Accepted: JPG, PNG, WEBP. Max 2MB.</small>
+                        </div>
+                    </div>
+
+                    <div class="profile-section">
+                        <p class="section-label">Phone:</p>
+                        <p class="section-text view-only"><?php echo htmlspecialchars($client['phone']); ?></p>
+                        <input class="edit-only profile-edit-input" type="text" name="phone" placeholder="Phone" value="<?php echo htmlspecialchars($cp['phone'] ?? ''); ?>" disabled>
+                    </div>
+
+                    <div class="profile-section">
+                        <p class="section-label">Bio:</p>
+                        <p class="section-text view-only"><?php echo htmlspecialchars($client['bio']); ?></p>
+                        <textarea class="edit-only profile-edit-textarea" name="bio" rows="4" placeholder="Tell others about you..." disabled><?php echo htmlspecialchars($cp['bio'] ?? ''); ?></textarea>
+                    </div>
+
+                    <div class="profile-actions">
+                        <button type="button" class="btn-primary view-only" onclick="toggleEditProfile(true)">
+                            <i class="fas fa-edit"></i>
+                            Edit Profile
+                        </button>
+                        <div class="edit-only edit-actions">
+                            <button type="submit" class="btn-primary">
+                                <i class="fas fa-save"></i>
+                                Save
+                            </button>
+                            <button type="button" class="btn-outline-secondary" onclick="toggleEditProfile(false)">
+                                Cancel
+                            </button>
+                        </div>
+                        <button type="button" class="btn-outline-secondary" onclick="window.location.href='logout.php'">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Logout
+                        </button>
+                    </div>
+                </form>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Stats -->
+                <div class="stats-grid stats-grid-4">
+                    <div class="stat-card stat-blue">
+                        <div class="stat-info">
+                            <p class="stat-label">Total Bookings</p>
+                            <p class="stat-value"><?php echo $stats['total_bookings']; ?></p>
+                        </div>
+                        <i class="fas fa-shopping-cart stat-icon"></i>
+                    </div>
+
+                    <div class="stat-card stat-green">
+                        <div class="stat-info">
+                            <p class="stat-label">Active Bookings</p>
+                            <p class="stat-value"><?php echo $stats['active_bookings']; ?></p>
+                        </div>
+                        <i class="fas fa-check-circle stat-icon"></i>
+                    </div>
+
+                    <div class="stat-card stat-amber">
+                        <div class="stat-info">
+                            <p class="stat-label">Completed</p>
+                            <p class="stat-value"><?php echo $stats['completed_bookings']; ?></p>
+                        </div>
+                        <i class="fas fa-trophy stat-icon"></i>
+                    </div>
+
+                    <div class="stat-card stat-purple">
+                        <div class="stat-info">
+                            <p class="stat-label">Pending Reviews</p>
+                            <p class="stat-value"><?php echo $stats['pending_reviews']; ?></p>
+                        </div>
+                        <i class="fas fa-star stat-icon"></i>
+                    </div>
+                </div>
+
+                <!-- Your Bookings -->
+                <section class="content-card">
+                    <div class="section-header">
+                        <h3>Your Bookings</h3>
+                        <button class="btn-primary" onclick="window.location.href='feed.php'">
+                            <i class="fas fa-plus"></i>
+                            Book a Service
+                        </button>
+                    </div>
+
+                    <div class="bookings-table-wrapper">
+                        <table class="bookings-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Service</th>
+                                    <th>Freelancer</th>
+                                    <th>Status / Actions</th>
+                                    <th>Total (₱)</th>
+                                    <th>Created</th>
+                                    <th>Review</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php $count = 1; foreach ($bookings as $booking): ?>
+                                <tr>
+                                    <td><?php echo $count++; ?></td>
+                                    <td>
+                                        <div class="service-cell">
+                                            <span class="service-name"><?php echo htmlspecialchars($booking['service_name']); ?></span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="freelancer-cell">
+                                    <img src="<?php echo htmlspecialchars($booking['freelancer_avatar']); ?>" 
+                                        alt="<?php echo htmlspecialchars($booking['freelancer_name']); ?>" 
+                                        class="freelancer-avatar-sm"
+                                        onerror="this.onerror=null;this.src='img/profile_icon.webp';">
+                                            <span><?php echo htmlspecialchars($booking['freelancer_name']); ?></span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <?php if ($booking['status'] === 'Completed'): ?>
+                                            <span class="badge badge-success">Completed</span>
+                                        <?php elseif ($booking['status'] === 'Cancel'): ?>
+                                            <span class="badge badge-danger">Cancelled</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-warning">Pending</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="total-cell">₱<?php echo number_format($booking['total'], 2); ?></td>
+                                    <td class="date-cell"><?php echo date('Y-m-d', strtotime($booking['created_at'])); ?><br>
+                                        <span class="time-text"><?php echo date('H:i:s', strtotime($booking['created_at'])); ?></span>
+                                    </td>
+                                    <td>
+                                        <?php if ($booking['has_review']): ?>
+                                            <span class="text-muted">Done</span>
+                                        <?php elseif (in_array($booking['raw_status'], ['delivered','completed'])): ?>
+                                            <button
+                                                class="btn-sm btn-warning"
+                                                onclick="openReviewModalFromButton(this)"
+                                                data-booking-id="<?php echo (int)$booking['id']; ?>"
+                                                data-service-name="<?php echo htmlspecialchars($booking['service_name'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                data-freelancer-name="<?php echo htmlspecialchars($booking['freelancer_name'], ENT_QUOTES, 'UTF-8'); ?>"
+                                                data-avatar="<?php echo htmlspecialchars($booking['freelancer_avatar'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            >
+                                                Review
+                                            </button>
+                                        <?php else: ?>
+                                            <span class="text-muted">N/A</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Bookings Pagination -->
+                    <div class="pagination">
+                        <?php 
+                        $prevBp = max(1, $bp-1); $nextBp = min($bookingsTotalPages, $bp+1);
+                        $base = strtok($_SERVER['REQUEST_URI'],'?');
+                        $qs = $_GET; unset($qs['bp']); $qs['rp'] = $rp; 
+                        $link = function($page) use ($base,$qs) { $qs['bp']=$page; return htmlspecialchars($base.'?'.http_build_query($qs)); };
+                        ?>
+                        <a class="page-btn <?php echo $bp<=1?'disabled':''; ?>" href="<?php echo $link($prevBp); ?>">
+                            <i class="fas fa-arrow-left"></i> Prev
+                        </a>
+                        <span class="page-num active">Page <?php echo $bp; ?> of <?php echo $bookingsTotalPages; ?></span>
+                        <a class="page-btn <?php echo $bp>=$bookingsTotalPages?'disabled':''; ?>" href="<?php echo $link($nextBp); ?>">
+                            Next <i class="fas fa-arrow-right"></i>
+                        </a>
+                    </div>
+                </section>
+
+                <!-- Reviews You Wrote -->
+                <section class="content-card">
+                    <h3>Reviews You Wrote</h3>
+                    
+                    <?php if (empty($reviews_written)): ?>
+                        <div class="empty-state">
+                            <i class="fas fa-star"></i>
+                            <p>You haven't written any reviews yet</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="reviews-list">
+                            <?php foreach ($reviews_written as $review): ?>
+                            <div class="review-card">
+                          <img src="<?php echo htmlspecialchars($review['freelancer_avatar']); ?>" 
+                              alt="<?php echo htmlspecialchars($review['freelancer_name']); ?>" 
+                              class="review-avatar"
+                              onerror="this.onerror=null;this.src='img/profile_icon.webp';">
+                                
+                                <div class="review-content">
+                                    <div class="review-header">
+                                        <div>
+                                            <h4><?php echo htmlspecialchars($review['freelancer_name']); ?></h4>
+                                            <p class="review-service-name"><?php echo htmlspecialchars($review['service_name']); ?></p>
+                                        </div>
+                                        <span class="review-date"><?php echo date('M d, Y', strtotime($review['created_at'])); ?></span>
+                                    </div>
+
+                                    <div class="review-rating">
+                                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                                            <i class="fas fa-star <?php echo $i <= $review['rating'] ? 'star-filled' : 'star-empty'; ?>"></i>
+                                        <?php endfor; ?>
+                                        <span class="rating-text">(<?php echo $review['rating']; ?>/5)</span>
+                                    </div>
+
+                                    <p class="review-comment"><?php echo htmlspecialchars($review['comment']); ?></p>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                    <!-- Reviews Pagination -->
+                    <div class="pagination">
+                        <?php 
+                        $prevRp = max(1, $rp-1); $nextRp = min($reviewsTotalPages, $rp+1);
+                        $base = strtok($_SERVER['REQUEST_URI'],'?');
+                        $qs = $_GET; unset($qs['rp']); $qs['bp'] = $bp;
+                        $rlink = function($page) use ($base,$qs) { $qs['rp']=$page; return htmlspecialchars($base.'?'.http_build_query($qs)); };
+                        ?>
+                        <a class="page-btn <?php echo $rp<=1?'disabled':''; ?>" href="<?php echo $rlink($prevRp); ?>">
+                            <i class="fas fa-arrow-left"></i> Prev
+                        </a>
+                        <span class="page-num active">Page <?php echo $rp; ?> of <?php echo $reviewsTotalPages; ?></span>
+                        <a class="page-btn <?php echo $rp>=$reviewsTotalPages?'disabled':''; ?>" href="<?php echo $rlink($nextRp); ?>">
+                            Next <i class="fas fa-arrow-right"></i>
+                        </a>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="reviewModal" class="modal">
+        <div class="modal-content modal-review">
+            <div class="modal-header-review">
+                <div class="modal-header-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div>
+                    <h3>Write a Review</h3>
+                    <p class="modal-subtitle">Share your experience with this service</p>
+                </div>
+                <button class="modal-close" onclick="closeReviewModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Service Info Display -->
+            <div class="review-modal-info">
+                <div class="review-modal-service">
+                    <span class="info-label">Service:</span>
+                    <span id="modalServiceName" class="info-value">-</span>
+                </div>
+                <div class="review-modal-freelancer">
+                    <img id="modalFreelancerAvatar" src="" alt="" class="modal-avatar" onerror="this.onerror=null;this.src='img/profile_icon.webp';">
+                    <div>
+                        <span class="info-label">Freelancer</span>
+                        <span id="modalFreelancerName" class="info-value-block">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <form id="reviewForm" method="POST" action="leave_review_client.php" onsubmit="return validateReview(event)">
+                <input type="hidden" id="bookingId" name="booking_id">
+                
+                <div class="form-group-modal">
+                    <label>How would you rate this service?</label>
+                    <div class="star-rating-container">
+                        <div class="star-rating">
+                            <i class="fas fa-star" data-rating="1"></i>
+                            <i class="fas fa-star" data-rating="2"></i>
+                            <i class="fas fa-star" data-rating="3"></i>
+                            <i class="fas fa-star" data-rating="4"></i>
+                            <i class="fas fa-star" data-rating="5"></i>
+                        </div>
+                        <span id="ratingText" class="rating-description">Select a rating</span>
+                    </div>
+                    <input type="hidden" id="rating" name="rating" value="0">
+                </div>
+
+                <div class="form-group-modal">
+                    <label for="comment">Your Review <span class="optional-text">(Optional)</span></label>
+                    <textarea id="comment" name="comment" rows="5" placeholder="Tell us about your experience. What did you like? What could be improved?" class="review-textarea"></textarea>
+                    <span class="char-count"><span id="charCount">0</span>/500 characters</span>
+                </div>
+
+                <div class="modal-footer-review">
+                    <button type="button" class="btn-cancel" onclick="closeReviewModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-submit-review">
+                        <i class="fas fa-paper-plane"></i>
+                        Submit Review
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    // Expose a map for quick lookup when opening review modal
+    window.BOOKINGS_BY_ID = <?php echo json_encode(array_reduce($bookings, function($acc,$b){
+        $acc[$b['id']] = [
+            'service_name' => $b['service_name'],
+            'freelancer_name' => $b['freelancer_name'],
+            'freelancer_avatar' => $b['freelancer_avatar']
+        ];
+        return $acc;
+    }, []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+
+    function openReviewModalFromButton(btn){
+        const bid   = btn.getAttribute('data-booking-id') || '';
+        const sname = btn.getAttribute('data-service-name') || '-';
+        const fname = btn.getAttribute('data-freelancer-name') || '-';
+    let fava  = btn.getAttribute('data-avatar') || '';
+    if (!fava) { fava = 'img/profile_icon.webp'; }
+        document.getElementById('bookingId').value = bid;
+        document.getElementById('modalServiceName').textContent = sname;
+        document.getElementById('modalFreelancerName').textContent = fname;
+        const img = document.getElementById('modalFreelancerAvatar');
+        img.src = fava; img.alt = fname;
+        // Reset rating + comment on open
+        const ratingInput = document.getElementById('rating');
+        ratingInput.value = '0';
+        document.querySelectorAll('.star-rating .fa-star').forEach(s=>s.classList.remove('star-filled'));
+        const rt = document.getElementById('ratingText'); if (rt) rt.textContent = 'Select a rating';
+        const ta = document.getElementById('comment'); if (ta) ta.value = '';
+        const cc = document.getElementById('charCount'); if (cc) cc.textContent = '0';
+        document.getElementById('reviewModal').classList.add('open');
+    }
+    function closeReviewModal(){
+        document.getElementById('reviewModal').classList.remove('open');
+    }
+    // Star rating interactions
+    (function(){
+        const stars = document.querySelectorAll('.star-rating .fas.fa-star');
+        const ratingInput = document.getElementById('rating');
+        const ratingText  = document.getElementById('ratingText');
+        const desc = ['Very bad','Bad','Okay','Good','Excellent'];
+        stars.forEach(star => {
+            star.addEventListener('click', () => {
+                const rating = parseInt(star.getAttribute('data-rating')) || 0;
+                ratingInput.value = rating;
+                stars.forEach(s => s.classList.toggle('star-filled', (parseInt(s.getAttribute('data-rating'))||0) <= rating));
+                if (ratingText) ratingText.textContent = rating ? desc[rating-1] + ' ('+rating+'/5)' : 'Select a rating';
+            });
+        });
+        // Char count for comment
+        const ta = document.getElementById('comment');
+        const cc = document.getElementById('charCount');
+        if (ta && cc){
+            ta.addEventListener('input', ()=>{ cc.textContent = Math.min(500, ta.value.length); });
+            ta.maxLength = 500;
+        }
+    })();
+    function validateReview(e){
+        const rating = parseInt(document.getElementById('rating').value)||0;
+        if (rating < 1){
+            alert('Please select a star rating.');
+            e.preventDefault();
+            return false;
+        }
+        return true;
+    }
+    function toggleEditProfile(edit){
+        const form = document.getElementById('profileCard');
+        if (!form) return;
+        if (edit) {
+            form.classList.add('editing');
+            // Enable inputs
+            form.querySelectorAll('.edit-only input, .edit-only textarea').forEach(el=>{
+                el.disabled = false; el.removeAttribute('disabled');
+                el.readOnly = false; el.removeAttribute('readonly');
+            });
+            ['first_name','last_name','phone','bio','profile_picture'].forEach(n=>{
+                const el = form.querySelector(`[name="${n}"]`);
+                if (el) {
+                    el.disabled = false; el.removeAttribute('disabled');
+                    el.readOnly = false; el.removeAttribute('readonly');
+                }
+            });
+            const first = form.querySelector('input[name="first_name"]');
+            if (first) first.focus();
+        } else {
+            // Reset unsaved changes and exit edit mode
+            if (typeof form.reset === 'function') form.reset();
+            // Disable inputs again
+            form.querySelectorAll('.edit-only input, .edit-only textarea').forEach(el=>{
+                el.disabled = true; el.setAttribute('disabled','disabled');
+                el.readOnly = true; el.setAttribute('readonly','readonly');
+            });
+            // Clear selected file and restore avatar preview
+            const file = form.querySelector('input[name="profile_picture"]');
+            if (file) file.value = '';
+            const img = form.querySelector('.profile-avatar');
+            if (img && img.dataset && img.dataset.origSrc) img.src = img.dataset.origSrc;
+            form.classList.remove('editing');
+        }
+    }
+
+    function previewProfileImage(e){
+        const file = e.target && e.target.files ? e.target.files[0] : null;
+        if (!file) return;
+        const img = document.querySelector('#profileCard .profile-avatar');
+        if (!img) return;
+        const url = URL.createObjectURL(file);
+        img.src = url;
+    }
+    </script>
+    <?php if (function_exists('flash_render')) echo flash_render(); ?>
+</body>
+</html>

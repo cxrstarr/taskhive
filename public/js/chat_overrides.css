@@ -1,0 +1,19 @@
+/* Prevent highlight overlap in side list/cards */
+.message-item { position: relative; box-sizing: border-box; }
+.message-item.selected { border-color: #F3F4F6; box-shadow: 0 0 0 2px #FDE68A inset; }
+.message-item:focus { outline: none; }
+
+/* Inbox cards (side list) */
+a.inbox-card { position: relative; border:1px solid #E5E7EB; border-radius: 12px; }
+a.inbox-card:focus { outline: none; }
+a.inbox-card:hover,
+a.inbox-card:focus-visible { box-shadow: 0 0 0 2px #FDE68A inset; }
+
+/* Read receipt UI */
+.msg-status { font-size: 11px; color: #6b7280; margin-top: 4px; text-align: right; user-select: none; }
+.msg-status .seen { color:#198754; font-weight: 600; }
+.msg-status .delivered { color:#6b7280; }
+
+/* Optional: ensure messages area contains effects */
+.messages-card { overflow: hidden; }
+.messages-sidebar { overflow: auto; }

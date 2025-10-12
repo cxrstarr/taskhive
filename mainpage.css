@@ -1,0 +1,124 @@
+/* MAIN PAGE LAYOUT FIXES */
+
+body {
+  background: #fffef8;
+}
+
+/* Top navbar height variable (approx) */
+.top-navbar {
+  min-height: 58px;
+  z-index: 1030;
+}
+
+/* Sidebar visible only for logged-in users (body.has-sidebar) */
+.sidebar {
+  background:#121416;
+  color:#eee;
+  width:220px;
+  position:fixed;
+  top:0;
+  left:0;
+  bottom:0;
+  padding-top:58px; /* push below navbar */
+  overflow-y:auto;
+  scrollbar-width: thin;
+  z-index:1020;
+}
+.sidebar .nav-link {
+  color:#d9d9d9;
+  font-size:0.9rem;
+  border-radius:6px;
+  padding:8px 12px;
+  transition:background .2s;
+}
+.sidebar .nav-link:hover,
+.sidebar .nav-link:focus {
+  background:#1f2326;
+  color:#fff;
+}
+
+body.has-sidebar .main-wrapper {
+  margin-left:220px;
+}
+
+/* Container max width - keep content centered but wide */
+.container-max {
+  max-width:1100px;
+}
+
+/* Ensure page has enough height (avoid footer hugging content) */
+.main-wrapper {
+  min-height: calc(100vh - 120px);
+  padding-top:70px; /* space below navbar on mobile too */
+  padding-bottom:30px;
+}
+
+/* Service Cards */
+.service-card {
+  border:1px solid #f4e2a5;
+  border-radius:14px;
+  background:#ffffff;
+  transition: box-shadow .25s, transform .15s;
+  display:flex;
+}
+.service-card:hover {
+  box-shadow:0 6px 18px rgba(0,0,0,0.12);
+  transform:translateY(-3px);
+}
+.service-card .badge {
+  font-size:0.75rem;
+}
+
+.service-search input {
+  border:2px solid #ffc107;
+  border-radius:8px;
+}
+.service-search input:focus {
+  box-shadow:none;
+  outline:2px solid #ffb700;
+}
+
+/* Pagination styling tweaks */
+.pagination .page-link {
+  color:#333;
+}
+.pagination .page-item.active .page-link {
+  background:#ffca28;
+  border-color:#ffca28;
+  color:#222;
+  font-weight:600;
+}
+
+/* Scrollbar (optional aesthetic) */
+.sidebar::-webkit-scrollbar {
+  width:8px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background:#1a1d20;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background:#30363b;
+  border-radius:4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991.98px) {
+  .sidebar {
+    position:static;
+    width:100%;
+    height:auto;
+    padding-top:0;
+    display:none; /* hide full sidebar on small screens (could add a toggle later) */
+  }
+  body.has-sidebar .main-wrapper {
+    margin-left:0;
+  }
+  .main-wrapper {
+    padding-top:80px;
+  }
+}
+
+/* Footer separation */
+.footer {
+  margin-top:0;
+}
