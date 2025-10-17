@@ -922,7 +922,7 @@ if (!empty($_SESSION['user_id'])) {
 
         // Make logo clickable to go home
         document.getElementById('logo')?.addEventListener('click', () => {
-            window.location.href = 'taskhive.php';
+            window.location.href = 'index.php';
         });
 
         // CTA button navigation (desktop + mobile)
