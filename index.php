@@ -1,374 +1,1025 @@
+<?php
+// Boot session and fetch current user (if any)
+if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/database.php';
+$db = new database();
+$currentUser = null;
+// Navbar notifications list
+$notifications = [];
+if (!empty($_SESSION['user_id'])) {
+    $u = $db->getUser((int)$_SESSION['user_id']);
+    if ($u) {
+        $currentUser = [
+            'id'     => (int)$u['user_id'],
+            'name'   => trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: ($u['email'] ?? 'User'),
+            'email'  => $u['email'] ?? '',
+            'avatar' => $u['profile_picture'] ?: 'img/profile_icon.webp',
+            'type'   => $u['user_type'] ?? null,
+        ];
+        // Load latest 10 notifications for the logged-in user
+        try {
+            $pdo = $db->opencon();
+            $stN = $pdo->prepare("SELECT notification_id,type,data,created_at,read_at FROM notifications WHERE user_id=:u ORDER BY created_at DESC LIMIT 10");
+            $stN->execute([':u' => (int)$currentUser['id']]);
+            foreach ($stN->fetchAll() as $n) {
+                $type = (string)$n['type'];
+                $data = [];
+                if (!empty($n['data'])) {
+                    $d = json_decode($n['data'], true);
+                    if (is_array($d)) $data = $d;
+                }
+                $msg = ucfirst(str_replace('_',' ', $type)) . ' update';
+                if (($type === 'system' || $type === 'admin_message') && isset($data['text'])) {
+                    $msg = 'System: ' . (string)$data['text'];
+                } elseif ($type === 'booking_status_changed' && isset($data['status'], $data['booking_id'])) {
+                    $msg = "Booking #{$data['booking_id']} status: ".ucfirst(str_replace('_',' ', $data['status']));
+                } elseif ($type === 'booking_created' && isset($data['booking_id'])) {
+                    $msg = "Booking #{$data['booking_id']} was created.";
+                } elseif ($type === 'payment_recorded' && isset($data['amount'])) {
+                    $msg = 'Payment received: \u20b1'.number_format((float)$data['amount'],2);
+                } elseif ($type === 'service_rejected') {
+                    $reason = isset($data['reason']) && $data['reason'] !== '' ? (string)$data['reason'] : '';
+                    $title  = isset($data['title']) && $data['title'] !== '' ? (string)$data['title'] : '';
+                    $msg = 'Service Approval: Rejected' . ($reason !== '' ? ' — ' . $reason : '') . ($title !== '' ? ' (' . $title . ')' : '');
+                } elseif ($type === 'service_approved') {
+                    $title  = isset($data['title']) && $data['title'] !== '' ? (string)$data['title'] : '';
+                    $msg = 'Service Approval: Approved' . ($title !== '' ? ' — ' . $title : '');
+                }
+                $notifications[] = [
+                    'id' => (int)$n['notification_id'],
+                    'message' => $msg,
+                    'time' => date('M d, Y g:i A', strtotime($n['created_at'] ?? date('Y-m-d H:i:s'))),
+                    'unread' => empty($n['read_at']),
+                ];
+            }
+        } catch (Throwable $e) { /* ignore */ }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TaskHive 🐝 - A Community Buzzing with Services</title>
-
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <!-- Custom CSS for Bee Theme -->
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-<!-- Navigation Bar -->
-<nav class="navbar navbar-expand-lg navbar-dark">
-  <div class="container">
-    <a class="navbar-brand" href="#">TaskHive 🐝</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
-            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="#services">Services</a></li>
-        <li class="nav-item"><a class="nav-link" href="#how-it-works">How It Works</a></li>
-        <li class="nav-item"><a class="nav-link" href="#monetization">Monetization</a></li>
-        <li class="nav-item"><a class="nav-link" href="#contact-us">Contact Us</a></li>
-
-        <!-- Custom Dropdown -->
-        <li class="nav-item">
-          <div class="dropdown">
-            <button class="btn btn-hive" id="dropdownToggle" aria-expanded="false">
-              Join the Hive
-            </button>
-            <div class="dropdown-menu" id="dropdownMenu" role="menu" aria-hidden="true">
-              <a role="menuitem" href="login.php">Login</a>
-              <a role="menuitem" href="register.php">Register</a>
-            </div>
-          </div>
-        </li>
-      </ul>
-    </div>
-  </div>
-</nav>
-
-<!-- Hero Section -->
-<section class="hero">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Hive - Find Your Buzz</title>
     
-  <div class="container">
-    <h1>Welcome to TaskHive 🐝</h1>
-    <p>A Community Buzzing with Services</p>
-    <p>From home tasks to personal projects, find trusted help or offer your skills locally with ease.</p>
-  </div>
-</section>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        @keyframes floatBee {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(20px, -30px) rotate(10deg); }
+            75% { transform: translate(-10px, -15px) rotate(-10deg); }
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(-100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes fadeInUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-float-bee { animation: floatBee 3s ease-in-out infinite; }
+        .animate-slide-in { animation: slideIn 0.6s ease-out; }
+        .animate-fade-in-up { animation: fadeInUp 0.6s ease-out; }
+        .animate-spin-slow { animation: spin 20s linear infinite; }
+        .animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
+        
+        .group:hover .group-hover\:translate-x-2 { transform: translateX(0.5rem); }
+        .group:hover .group-hover\:scale-110 { transform: scale(1.1); }
+        .group:hover .group-hover\:rotate-360 { transform: rotate(360deg); }
+        
+        .transition-transform { transition: transform 0.3s ease; }
+        .transition-all { transition: all 0.3s ease; }
+        
+        .bg-honeycomb {
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='104' viewBox='0 0 60 104' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l25.98 15v30L30 60 4.02 45V15z' fill='%23f59e0b' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+        
+        .hover-lift {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(245, 158, 11, 0.2);
+        }
+        
+        .mobile-menu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        .mobile-menu.active {
+            max-height: 500px;
+        }
+        
+        /* Notifications dropdown animation and visibility */
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .dropdown { display: none; opacity: 0; }
+        .dropdown.active { display: block; animation: slideDown 0.2s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
 
+    <!-- Navbar -->
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-amber-200/50 shadow-sm animate-slide-in">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <!-- Logo -->
+                <div id="logo" class="flex items-center gap-3 cursor-pointer hover:scale-105 transition-transform">
+                    <div class="relative">
+                        <svg class="w-10 h-10 fill-amber-400 stroke-amber-600 stroke-2" viewBox="0 0 24 24">
+                            <polygon points="12 2, 22 8.5, 22 15.5, 12 22, 2 15.5, 2 8.5"/>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center animate-spin-slow">
+                            <div class="w-3 h-3 rounded-full bg-amber-600"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-amber-900 tracking-tight">Task Hive</h1>
+                        <p class="text-xs text-amber-700 -mt-1">Find Your Buzz</p>
+                    </div>
+                </div>
 
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="feed.php" class="text-gray-700 hover:text-amber-600 transition-colors relative group">
+                        Find Gigs
+                        <span class="absolute -bottom-1 left-0 h-0.5 bg-amber-500 w-0 group-hover:w-full transition-all duration-300"></span>
+                    </a>
+                    <a href="dashboard.php" class="text-gray-700 hover:text-amber-600 transition-colors relative group">
+                        Post a Task
+                        <span class="absolute -bottom-1 left-0 h-0.5 bg-amber-500 w-0 group-hover:w-full transition-all duration-300"></span>
+                    </a>
+                    <a href="#how-it-works" class="text-gray-700 hover:text-amber-600 transition-colors relative group">
+                        How It Works
+                        <span class="absolute -bottom-1 left-0 h-0.5 bg-amber-500 w-0 group-hover:w-full transition-all duration-300"></span>
+                    </a>
+                </div>
 
- <section id="services" class="services py-5">
-  <div class="container">
-    <h2 class="text-center mb-5">Popular Services</h2>
-    <div class="row g-4">
-      
-      <!-- Delivery -->
-      <div class="col-md-4">
-        <div class="card service-card h-100 shadow-sm border-0 text-center">
-            <img src="images/delivery.png" class="card-img-top service-icon mx-auto mt-3" alt="Delivery">
-          <div class="card-body">
-            <h5 class="card-title">Delivery</h5>
-            <p class="card-text">Swift and reliable local delivery services.</p>
-          </div>
+                <!-- Right side: CTAs or User Profile (desktop) -->
+                <div class="hidden md:flex items-center gap-4">
+                    <?php if ($currentUser): ?>
+                        <!-- Notifications -->
+                        <div class="relative">
+                            <button onclick="toggleNotifications()" class="relative p-2 hover:bg-amber-100 rounded-full transition-colors hover:scale-105" title="Notifications">
+                                <i data-lucide="bell" class="w-5 h-5 text-gray-700"></i>
+                                <span class="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
+                            </button>
+
+                            <div id="notifications-dropdown" class="dropdown absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-amber-200 overflow-hidden">
+                                <div class="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-b border-amber-200 flex items-center justify-between">
+                                    <h3 class="font-bold text-gray-900">Notifications</h3>
+                                    <button onclick="markAllAsRead()" class="text-xs text-amber-600 hover:text-amber-700 font-medium">Mark all as read</button>
+                                </div>
+                                <div class="max-h-96 overflow-y-auto">
+                                    <?php foreach ($notifications as $notif): ?>
+                                        <div class="notification-item p-4 border-b border-amber-100 <?php echo $notif['unread'] ? 'bg-blue-50/50' : ''; ?>">
+                                            <div class="flex items-start gap-3">
+                                                <?php if ($notif['unread']): ?>
+                                                    <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                                <?php endif; ?>
+                                                <div class="flex-1">
+                                                    <p class="text-sm text-gray-800"><?php echo htmlspecialchars($notif['message']); ?></p>
+                                                    <p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($notif['time']); ?></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                    <?php if (!count($notifications)): ?>
+                                        <div class="p-4 text-sm text-gray-600">No notifications</div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Profile Dropdown Trigger -->
+                        <div class="relative">
+                            <button id="profile-btn" class="flex items-center gap-3 px-3 py-2 hover:bg-amber-50 rounded-full transition-colors">
+                                <img src="<?php echo htmlspecialchars($currentUser['avatar']); ?>" alt="<?php echo htmlspecialchars($currentUser['name']); ?>" class="w-8 h-8 rounded-full border-2 border-amber-400 object-cover">
+                                <span class="hidden lg:block text-sm font-medium text-gray-900"><?php echo htmlspecialchars($currentUser['name']); ?></span>
+                                <svg id="dropdown-arrow" class="w-4 h-4 text-gray-500 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+
+                            <!-- Dropdown Menu -->
+                            <div id="profile-dropdown" class="profile-dropdown absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-amber-200 overflow-hidden hidden">
+                                <!-- User Info -->
+                                <div class="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-b border-amber-200">
+                                    <div class="flex items-center gap-3">
+                                        <img src="<?php echo htmlspecialchars($currentUser['avatar']); ?>" alt="<?php echo htmlspecialchars($currentUser['name']); ?>" class="w-12 h-12 rounded-full border-2 border-amber-400 object-cover">
+                                        <div>
+                                            <div class="font-medium text-gray-900"><?php echo htmlspecialchars($currentUser['name']); ?></div>
+                                            <div class="text-sm text-gray-600"><?php echo htmlspecialchars($currentUser['email']); ?></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Menu Items -->
+                                <div class="py-2">
+                                    <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
+                                        <i data-lucide="user" class="w-5 h-5 text-amber-600"></i>
+                                        <span>View Dashboard</span>
+                                    </a>
+                                    <a href="settings.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
+                                        <i data-lucide="settings" class="w-5 h-5 text-amber-600"></i>
+                                        <span>Settings</span>
+                                    </a>
+                                    <div class="my-2 border-t border-gray-200"></div>
+                                    <a href="logout.php" class="flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 hover:translate-x-1 transition-all">
+                                        <i data-lucide="log-out" class="w-5 h-5"></i>
+                                        <span>Logout</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <button id="btn-signin-desktop" class="px-5 py-2.5 text-amber-700 hover:text-amber-900 transition-colors hover:scale-105">
+                            Sign In
+                        </button>
+                        <button id="btn-register-desktop" class="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                            Make an Account
+                        </button>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-btn" class="md:hidden p-2 text-amber-700 hover:bg-amber-100 rounded-lg transition-colors">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+            </div>
         </div>
-      </div>
 
-      <!-- Babysitting -->
-      <div class="col-md-4">
-        <div class="card service-card h-100 shadow-sm border-0 text-center">
-          <img src="images/babysitting.png" class="card-img-top service-icon mx-auto mt-3" alt="Babysitting">
-          <div class="card-body">
-            <h5 class="card-title">Babysitting</h5>
-            <p class="card-text">Trusted caregivers for your little ones.</p>
-          </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="mobile-menu md:hidden bg-white border-t border-amber-200">
+            <div class="px-4 py-6 space-y-4">
+                <a href="feed.php" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">Find Gigs</a>
+                <a href="post_service.php" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">Post a Task</a>
+                <a href="#how-it-works" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">How It Works</a>
+                <a href="payment_terms.php" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">Pricing</a>
+                <div class="pt-4 space-y-3 border-t border-amber-200">
+                    <?php if ($currentUser): ?>
+                        <div class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <img src="<?php echo htmlspecialchars($currentUser['avatar']); ?>" alt="<?php echo htmlspecialchars($currentUser['name']); ?>" class="w-10 h-10 rounded-full border-2 border-amber-400 object-cover">
+                            <div>
+                                <div class="font-medium text-gray-900"><?php echo htmlspecialchars($currentUser['name']); ?></div>
+                                <div class="text-xs text-gray-600"><?php echo htmlspecialchars($currentUser['email']); ?></div>
+                            </div>
+                        </div>
+                        <a href="dashboard.php" class="block w-full text-center py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">View Dashboard</a>
+                        <a href="settings.php" class="block w-full text-center py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">Settings</a>
+                        <a href="logout.php" class="block w-full text-center py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-full shadow-lg">Logout</a>
+                    <?php else: ?>
+                        <button id="btn-signin-mobile" class="w-full py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">Sign In</button>
+                        <button id="btn-register-mobile" class="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg">Make an Account</button>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
-      </div>
+    </nav>
 
-      <!-- Handyman -->
-      <div class="col-md-4">
-        <div class="card service-card h-100 shadow-sm border-0 text-center">
-          <img src="images/handyman.png" class="card-img-top service-icon mx-auto mt-3" alt="Handyman Work">
-          <div class="card-body">
-            <h5 class="card-title">Handyman Work</h5>
-            <p class="card-text">Fixes and repairs to keep your hive humming.</p>
-          </div>
+    <!-- Hero Section -->
+    <section class="relative overflow-hidden pt-20 pb-32">
+        <!-- Animated Background Elements -->
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+            <div class="absolute w-32 h-32 opacity-10 animate-spin-slow" style="left: 10%; top: 20%;">
+                <svg viewBox="0 0 100 100" class="w-full h-full fill-amber-400">
+                    <polygon points="50 0, 93.3 25, 93.3 75, 50 100, 6.7 75, 6.7 25"/>
+                </svg>
+            </div>
+            <div class="absolute w-32 h-32 opacity-10 animate-spin-slow" style="left: 80%; top: 60%; animation-duration: 25s;">
+                <svg viewBox="0 0 100 100" class="w-full h-full fill-amber-400">
+                    <polygon points="50 0, 93.3 25, 93.3 75, 50 100, 6.7 75, 6.7 25"/>
+                </svg>
+            </div>
         </div>
-      </div>
 
-      <!-- Tutoring -->
-      <div class="col-md-4">
-        <div class="card service-card h-100 shadow-sm border-0 text-center">
-          <img src="images/tutoring.png" class="card-img-top service-icon mx-auto mt-3" alt="Tutoring">
-          <div class="card-body">
-            <h5 class="card-title">Tutoring</h5>
-            <p class="card-text">Personalized learning to help you soar.</p>
-          </div>
-        </div>
-      </div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Left Content -->
+                <div class="text-center lg:text-left animate-fade-in-up">
+                    <div class="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 border border-amber-300 rounded-full mb-6">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-amber-600"></i>
+                        <span class="text-sm text-amber-800">Join 50,000+ Freelancers</span>
+                    </div>
 
-      <!-- Pet Sitting -->
-      <div class="col-md-4">
-        <div class="card service-card h-100 shadow-sm border-0 text-center">
-          <img src="images/petsitting.png" class="card-img-top service-icon mx-auto mt-3" alt="Pet Sitting">
-          <div class="card-body">
-            <h5 class="card-title">Pet Sitting</h5>
-            <p class="card-text">Loving care for your pets while you're away.</p>
-          </div>
-        </div>
-      </div>
+                    <h1 class="text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+                        Where Work 
+                        <span class="relative inline-block">
+                            <span class="relative z-10 text-amber-600">Buzzes</span>
+                            <span class="absolute inset-0 bg-amber-200 -skew-x-12"></span>
+                        </span> 
+                        to Life
+                    </h1>
 
-      <!-- House Cleaning -->
-      <div class="col-md-4">
-        <div class="card service-card h-100 shadow-sm border-0 text-center">
-          <img src="images/cleaning.png" class="card-img-top service-icon mx-auto mt-3" alt="House Cleaning">
-          <div class="card-body">
-            <h5 class="card-title">House Cleaning</h5>
-            <p class="card-text">Professional cleaning services to keep your home sparkling.</p>
-          </div>
-        </div>
-      </div>
+                    <p class="text-xl text-gray-600 mb-8 max-w-xl mx-auto lg:mx-0">
+                        Connect with opportunities, find skilled freelancers, and build your career in the world's most vibrant gig marketplace.
+                    </p>
 
-    </div>
-  </div>
-</section>
+                    <!-- Search Bar -->
+                    <div class="relative max-w-2xl mx-auto lg:mx-0">
+                        <div class="flex gap-2 bg-white p-2 rounded-full shadow-xl border border-amber-200 hover:shadow-2xl transition-shadow duration-300">
+                            <div class="flex-1 flex items-center gap-3 px-4">
+                                <i data-lucide="search" class="w-5 h-5 text-gray-400"></i>
+                                <input id="search-input" type="text" placeholder="Search for gigs, skills, or freelancers..." class="flex-1 bg-transparent border-none outline-none text-gray-700 placeholder-gray-400">
+                            </div>
+                            <button id="search-btn" class="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105">
+                                Search
+                            </button>
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-2 mt-4 justify-center lg:justify-start">
+                            <span class="text-sm text-gray-500">Popular:</span>
+                            <span class="search-chip px-3 py-1 bg-white rounded-full text-sm text-amber-700 border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors" data-query="Web Design">Web Design</span>
+                            <span class="search-chip px-3 py-1 bg-white rounded-full text-sm text-amber-700 border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors" data-query="Writing">Writing</span>
+                            <span class="search-chip px-3 py-1 bg-white rounded-full text-sm text-amber-700 border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors" data-query="Marketing">Marketing</span>
+                            <span class="search-chip px-3 py-1 bg-white rounded-full text-sm text-amber-700 border border-amber-200 cursor-pointer hover:bg-amber-50 transition-colors" data-query="Development">Development</span>
+                        </div>
+                    </div>
+                </div>
 
-<!-- Freelancer Showcase Section -->
-<section id="freelancers" class="freelancers py-5">
-  <div class="container">
-    <h2 class="text-center mb-5">Freelancer who offers services</h2>
-    <div class="row g-4">
+                <!-- Right Content - Illustration -->
+                <div class="relative animate-float">
+                    <div class="relative bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl p-8 shadow-2xl">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-white rounded-2xl p-6 shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                                <div class="text-3xl mb-2">💼</div>
+                                <div class="text-xs text-gray-500">Business</div>
+                                <div class="text-lg font-bold text-amber-600 mt-1">2.5k+</div>
+                            </div>
+                            <div class="bg-white rounded-2xl p-6 shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                                <div class="text-3xl mb-2">🎨</div>
+                                <div class="text-xs text-gray-500">Creative</div>
+                                <div class="text-lg font-bold text-amber-600 mt-1">3.1k+</div>
+                            </div>
+                            <div class="bg-white rounded-2xl p-6 shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                                <div class="text-3xl mb-2">💻</div>
+                                <div class="text-xs text-gray-500">Tech</div>
+                                <div class="text-lg font-bold text-amber-600 mt-1">4.2k+</div>
+                            </div>
+                            <div class="bg-white rounded-2xl p-6 shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                                <div class="text-3xl mb-2">📱</div>
+                                <div class="text-xs text-gray-500">Marketing</div>
+                                <div class="text-lg font-bold text-amber-600 mt-1">1.8k+</div>
+                            </div>
+                        </div>
+                    </div>
 
-      <!-- Freelancer 1 -->
-      <div class="col-md-4">
-        <div class="card h-100 shadow-sm border-0 text-center p-3">
-          <img src="img/freelance1.webp" 
-               class="card-img-top rounded-circle mx-auto mt-3" 
-               alt="Freelancer 1" 
-               style="width:120px; height:120px; object-fit:cover;">
-          <div class="card-body d-flex flex-column">
-            <h5 class="card-title">Maria Santos</h5>
-            <p class="card-text text-muted">Web Developer</p>
-            <p class="card-text flex-grow-1">
-              Passionate about building modern, responsive websites. Skilled in HTML, CSS, JavaScript, and PHP.
-            </p>
-            <a href="login.php" class="btn btn-hive mt-auto">Hire</a>
-          </div>
-        </div>
-      </div>
-
-      
-
-      <!-- Freelancer 2 -->
-      <div class="col-md-4">
-        <div class="card h-100 shadow-sm border-0 text-center p-3">
-          <img src="img/freelance2.webp" 
-               class="card-img-top rounded-circle mx-auto mt-3" 
-               alt="Freelancer 2" 
-               style="width:120px; height:120px; object-fit:cover;">
-          <div class="card-body d-flex flex-column">
-            <h5 class="card-title">John Reyes</h5>
-            <p class="card-text text-muted">Graphic Designer</p>
-            <p class="card-text flex-grow-1">
-              Creative designer specializing in logos, posters, and brand identity. Turning ideas into visuals.
-            </p>
-            <a href="login.php" class="btn btn-hive mt-auto">Hire</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Freelancer 3 -->
-      <div class="col-md-4">
-        <div class="card h-100 shadow-sm border-0 text-center p-3">
-          <img src="img/freelance3.jpg" 
-               class="card-img-top rounded-circle mx-auto mt-3" 
-               alt="Freelancer 3" 
-               style="width:120px; height:120px; object-fit:cover;">
-          <div class="card-body d-flex flex-column">
-            <h5 class="card-title">Angela Cruz</h5>
-            <p class="card-text text-muted">Content Writer</p>
-            <p class="card-text flex-grow-1">
-              Experienced writer delivering engaging blogs, articles, and copywriting tailored to your audience.
-            </p>
-            <a href="login.php" class="btn btn-hive mt-auto">Hire</a>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-
-<section id="reviews" class="reviews py-5">
-  <div class="container">
-    <h2 class="text-center mb-5">What Our Users Say</h2>
-    <div class="row">
-      <!-- Review 1 -->
-      <div class="col-md-4">
-        <div class="card shadow-sm border-0 h-100">
-          <div class="card-body text-center">
-            <p class="mb-3">“TaskHive made it so easy for me to find reliable help for my home repairs. I love the secure payment system!”</p>
-            <h6 class="fw-bold mb-0">– Maria S.</h6>
-            <small class="text-muted">Client</small>
-          </div>
-        </div>
-      </div>
-      <!-- Review 2 -->
-      <div class="col-md-4">
-        <div class="card shadow-sm border-0 h-100">
-          <div class="card-body text-center">
-            <p class="mb-3">“As a freelancer, I’ve been able to grow my side hustle into a full-time job thanks to TaskHive’s premium listing feature.”</p>
-            <h6 class="fw-bold mb-0">– John D.</h6>
-            <small class="text-muted">Freelancer</small>
-          </div>
-        </div>
-      </div>
-      <!-- Review 3 -->
-      <div class="col-md-4">
-        <div class="card shadow-sm border-0 h-100">
-          <div class="card-body text-center">
-            <p class="mb-3">“The platform is easy to use, and the customer support team is always responsive. Highly recommend TaskHive!”</p>
-            <h6 class="fw-bold mb-0">– Alex R.</h6>
-            <small class="text-muted">Client</small>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-
-    <!-- How It Works Section -->
-<section id="how-it-works" class="how-it-works py-5">
-  <div class="container">
-    <h2 class="text-center mb-5">How TaskHive Works</h2>
-    <div class="row">
-      <!-- Step 1 -->
-      <div class="col-md-4 text-center mb-4">
-        <h4>1. Join the Hive</h4>
-        <p>
-          Sign up for free as a <strong>client</strong> or <strong>freelancer</strong>.  
-          Create your profile, highlight your skills, or list the services you’re looking for.  
-          The more detailed your profile, the easier it is to connect with others.
-        </p>
-      </div>
-      <!-- Step 2 -->
-      <div class="col-md-4 text-center mb-4">
-        <h4>2. List or Browse Services</h4>
-        <p>
-          <strong>Freelancers:</strong> Post your services with descriptions, rates, and availability.  
-          <strong>Clients:</strong> Search through categories, compare offers, and choose the service that best fits your needs.  
-          TaskHive makes it simple to connect the right people together.
-        </p>
-      </div>
-      <!-- Step 3 -->
-      <div class="col-md-4 text-center mb-4">
-        <h4>3. Complete Tasks & Get Paid</h4>
-        <p>
-          Once a service is agreed upon, the freelancer completes the task.  
-          Payments are handled securely through TaskHive, so both clients and freelancers can work with confidence.  
-          Leave ratings and reviews to help the community grow stronger.
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-    <!-- Monetization Section -->
-    <section id="monetization" class="monetization py-5">
-  <div class="container">
-    <h2 class="text-center mb-5">Monetization Options</h2>
-    <div class="row">
-      <!-- Commission -->
-      <div class="col-md-6 mb-4">
-        <h4>1. Commission on Tasks</h4>
-        <p>
-          TaskHive sustains itself by charging a small percentage fee on every completed task.  
-          This ensures the platform remains secure and reliable while allowing freelancers to focus on delivering great results.
-        </p>
-      </div>
-      <!-- Premium Listings -->
-      <div class="col-md-6 mb-4">
-        <h4>2. Premium Listings</h4>
-        <p>
-          Freelancers can upgrade their profiles or services to premium listings, giving them priority placement in search results.  
-          This boosts visibility and increases their chances of being hired by clients.
-        </p>
-      </div>
-      <!-- Subscription Plans -->
-      <div class="col-md-6 mb-4">
-        <h4>3. Subscription Plans</h4>
-        <p>
-          Regular freelancers and agencies can subscribe to monthly or yearly plans.  
-          These plans unlock benefits like reduced commission fees, exclusive promotional features, and advanced analytics to track performance.
-        </p>
-      </div>
-      <!-- Advertising -->
-      <div class="col-md-6 mb-4">
-        <h4>4. Advertising Opportunities</h4>
-        <p>
-          Businesses and service providers can advertise within TaskHive to reach a targeted audience of clients and freelancers.  
-          This provides an additional revenue stream while keeping ads relevant and non-intrusive.
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-    <!-- Contact Us Section -->
-<section class="contact-us">
-  <div class="contact-card">
-    <h2>Contact Us</h2>
-    <p>We’d love to hear from you! Fill out the form below.</p>
-    <form>
-      <input type="text" class="form-control mb-3" placeholder="Your Name">
-      <input type="email" class="form-control mb-3" placeholder="Your Email">
-      <textarea class="form-control mb-3" rows="4" placeholder="Your Message"></textarea>
-      <button type="submit" class="btn btn-hive">Send Message</button>
-    </form>
-  </div>
-</section>
-
-
-    <!-- Call to Action -->
-    <section class="cta">
-        <div class="container">
-            <h2>Join TaskHive Today! 🐝</h2>
-            <p>Be part of a community buzzing with local services.</p>
-            <a href="#" class="btn btn-hive btn-lg">Join the Hive</a>
+                    <!-- Floating Bees -->
+                    <div class="absolute text-2xl animate-float-bee" style="left: 20%; top: 10%;">🐝</div>
+                    <div class="absolute text-2xl animate-float-bee" style="left: 50%; top: 30%; animation-delay: 0.5s;">🐝</div>
+                    <div class="absolute text-2xl animate-float-bee" style="left: 80%; top: 50%; animation-delay: 1s;">🐝</div>
+                </div>
+            </div>
         </div>
     </section>
 
-   <!-- Footer -->
-<footer class="footer">
-  <div class="container">
-    <p>&copy; 2025 TaskHive. All rights reserved.</p>
-  </div>
-</footer>
+    <!-- Stats Section -->
+    <section class="py-16 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-r from-amber-100 via-yellow-100 to-orange-100 opacity-50"></div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="text-center group">
+                    <div class="inline-block group-hover:scale-110 transition-transform">
+                        <div class="text-4xl lg:text-5xl font-bold text-amber-600 mb-2">
+                            <span class="counter" data-target="50000">0</span>+
+                        </div>
+                        <div class="text-sm text-gray-600 group-hover:text-amber-700 transition-colors">Active Freelancers</div>
+                    </div>
+                </div>
+                <div class="text-center group">
+                    <div class="inline-block group-hover:scale-110 transition-transform">
+                        <div class="text-4xl lg:text-5xl font-bold text-amber-600 mb-2">
+                            <span class="counter" data-target="15000">0</span>+
+                        </div>
+                        <div class="text-sm text-gray-600 group-hover:text-amber-700 transition-colors">Projects Completed</div>
+                    </div>
+                </div>
+                <div class="text-center group">
+                    <div class="inline-block group-hover:scale-110 transition-transform">
+                        <div class="text-4xl lg:text-5xl font-bold text-amber-600 mb-2">
+                            <span class="counter" data-target="98">0</span>%
+                        </div>
+                        <div class="text-sm text-gray-600 group-hover:text-amber-700 transition-colors">Client Satisfaction</div>
+                    </div>
+                </div>
+                <div class="text-center group">
+                    <div class="inline-block group-hover:scale-110 transition-transform">
+                        <div class="text-4xl lg:text-5xl font-bold text-amber-600 mb-2">
+                            <span class="counter" data-target="150">0</span>+
+                        </div>
+                        <div class="text-sm text-gray-600 group-hover:text-amber-700 transition-colors">Countries Reached</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Features Section -->
+    <section class="py-24 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+                    Why Choose <span class="text-amber-600">Task Hive</span>?
+                </h2>
+                <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                    Experience the sweetest way to connect, collaborate, and succeed in the gig economy.
+                </p>
+            </div>
 
-<!-- Dropdown Script -->
-<script>
-const toggleBtn = document.getElementById('dropdownToggle');
-const menu = document.getElementById('dropdownMenu');
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="group hover-lift bg-white rounded-2xl p-8 shadow-lg border border-amber-100">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 p-3 mb-6 shadow-lg group-hover:rotate-360 transition-transform duration-500">
+                        <i data-lucide="shield" class="w-full h-full text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Secure Payments</h3>
+                    <p class="text-gray-600 leading-relaxed">Protected transactions with escrow system ensuring safety for both clients and freelancers.</p>
+                </div>
 
-toggleBtn.addEventListener('click', () => {
-  const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
-  toggleBtn.setAttribute('aria-expanded', !isExpanded);
-  menu.classList.toggle('show');
-});
+                <div class="group hover-lift bg-white rounded-2xl p-8 shadow-lg border border-amber-100">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 p-3 mb-6 shadow-lg group-hover:rotate-360 transition-transform duration-500">
+                        <i data-lucide="zap" class="w-full h-full text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Quick Matching</h3>
+                    <p class="text-gray-600 leading-relaxed">AI-powered algorithm connects you with the perfect opportunities in seconds.</p>
+                </div>
 
-document.addEventListener('click', (e) => {
-  if (!toggleBtn.contains(e.target) && !menu.contains(e.target)) {
-    toggleBtn.setAttribute('aria-expanded', 'false');
-    menu.classList.remove('show');
-  }
-});
-</script>
+                <div class="group hover-lift bg-white rounded-2xl p-8 shadow-lg border border-amber-100">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 p-3 mb-6 shadow-lg group-hover:rotate-360 transition-transform duration-500">
+                        <i data-lucide="users" class="w-full h-full text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Verified Talents</h3>
+                    <p class="text-gray-600 leading-relaxed">All freelancers are thoroughly vetted to ensure quality and professionalism.</p>
+                </div>
+
+                <div class="group hover-lift bg-white rounded-2xl p-8 shadow-lg border border-amber-100">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 p-3 mb-6 shadow-lg group-hover:rotate-360 transition-transform duration-500">
+                        <i data-lucide="award" class="w-full h-full text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Quality Guaranteed</h3>
+                    <p class="text-gray-600 leading-relaxed">Built-in review system and milestone tracking for exceptional results.</p>
+                </div>
+
+                <div class="group hover-lift bg-white rounded-2xl p-8 shadow-lg border border-amber-100">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 p-3 mb-6 shadow-lg group-hover:rotate-360 transition-transform duration-500">
+                        <i data-lucide="dollar-sign" class="w-full h-full text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Fair Pricing</h3>
+                    <p class="text-gray-600 leading-relaxed">Transparent pricing with no hidden fees. Only pay when you're satisfied.</p>
+                </div>
+
+                <div class="group hover-lift bg-white rounded-2xl p-8 shadow-lg border border-amber-100">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 p-3 mb-6 shadow-lg group-hover:rotate-360 transition-transform duration-500">
+                        <i data-lucide="clock" class="w-full h-full text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">24/7 Support</h3>
+                    <p class="text-gray-600 leading-relaxed">Round-the-clock customer support to help you whenever you need assistance.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Categories Section -->
+    <section id="categories" class="py-24 bg-white relative overflow-hidden bg-honeycomb">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+                    Explore Popular <span class="text-amber-600">Categories</span>
+                </h2>
+                <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                    Discover opportunities across hundreds of categories or post your own task.
+                </p>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="group cursor-pointer hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+                    <div class="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-amber-100 relative overflow-hidden" data-category="Development & IT">
+                        <div class="w-12 h-12 rounded-xl bg-blue-500 bg-opacity-10 flex items-center justify-center mb-4">
+                            <i data-lucide="code" class="w-6 h-6 text-blue-500"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">Development & IT</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">4,250 jobs</span>
+                            <span class="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+                    <div class="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-amber-100 relative overflow-hidden" data-category="Design & Creative">
+                        <div class="w-12 h-12 rounded-xl bg-purple-500 bg-opacity-10 flex items-center justify-center mb-4">
+                            <i data-lucide="palette" class="w-6 h-6 text-purple-500"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">Design & Creative</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">3,180 jobs</span>
+                            <span class="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+                    <div class="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-amber-100 relative overflow-hidden" data-category="Marketing & Sales">
+                        <div class="w-12 h-12 rounded-xl bg-pink-500 bg-opacity-10 flex items-center justify-center mb-4">
+                            <i data-lucide="megaphone" class="w-6 h-6 text-pink-500"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">Marketing & Sales</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">2,940 jobs</span>
+                            <span class="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+                    <div class="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-amber-100 relative overflow-hidden" data-category="Writing & Content">
+                        <div class="w-12 h-12 rounded-xl bg-green-500 bg-opacity-10 flex items-center justify-center mb-4">
+                            <i data-lucide="file-text" class="w-6 h-6 text-green-500"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">Writing & Content</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">2,710 jobs</span>
+                            <span class="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+                    <div class="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-amber-100 relative overflow-hidden" data-category="Video & Animation">
+                        <div class="w-12 h-12 rounded-xl bg-red-500 bg-opacity-10 flex items-center justify-center mb-4">
+                            <i data-lucide="camera" class="w-6 h-6 text-red-500"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">Video & Animation</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">1,890 jobs</span>
+                            <span class="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+                    <div class="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-amber-100 relative overflow-hidden" data-category="Business & Consulting">
+                        <div class="w-12 h-12 rounded-xl bg-indigo-500 bg-opacity-10 flex items-center justify-center mb-4">
+                            <i data-lucide="trending-up" class="w-6 h-6 text-indigo-500"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">Business & Consulting</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">1,650 jobs</span>
+                            <span class="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+                    <div class="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-amber-100 relative overflow-hidden" data-category="Music & Audio">
+                        <div class="w-12 h-12 rounded-xl bg-orange-500 bg-opacity-10 flex items-center justify-center mb-4">
+                            <i data-lucide="music" class="w-6 h-6 text-orange-500"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">Music & Audio</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">980 jobs</span>
+                            <span class="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+                    <div class="bg-gradient-to-br from-white to-amber-50 rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow border border-amber-100 relative overflow-hidden" data-category="E-commerce">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-500 bg-opacity-10 flex items-center justify-center mb-4">
+                            <i data-lucide="shopping-bag" class="w-6 h-6 text-cyan-500"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors">E-commerce</h3>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500">1,420 jobs</span>
+                            <span class="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-12">
+                <a href="#categories" class="inline-block px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    Browse All Categories
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="py-24 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-b from-amber-50 to-white"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+                    How <span class="text-amber-600">Task Hive</span> Works
+                </h2>
+                <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                    Getting started is as easy as 1-2-3-4. Join the hive and start buzzing!
+                </p>
+            </div>
+
+            <div class="relative">
+                <div class="hidden lg:block absolute top-1/2 left-0 right-0 h-1 bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 -translate-y-1/2"></div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
+                    <div class="relative">
+                        <div class="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-amber-100 group h-full">
+                            <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">01</div>
+                            <div class="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mb-6 group-hover:from-amber-500 group-hover:to-orange-500 transition-all duration-300">
+                                <i data-lucide="user-plus" class="w-8 h-8 text-amber-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Create Your Profile</h3>
+                            <p class="text-gray-600 leading-relaxed">Sign up in minutes and showcase your skills or describe your project needs.</p>
+                        </div>
+                        <div class="hidden lg:block absolute top-1/2 -right-12 text-2xl z-20 animate-float-bee">🐝</div>
+                    </div>
+
+                    <div class="relative">
+                        <div class="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-amber-100 group h-full">
+                            <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">02</div>
+                            <div class="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mb-6 group-hover:from-amber-500 group-hover:to-orange-500 transition-all duration-300">
+                                <i data-lucide="search" class="w-8 h-8 text-amber-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Find or Post Jobs</h3>
+                            <p class="text-gray-600 leading-relaxed">Browse thousands of gigs or post your own task to attract top talent.</p>
+                        </div>
+                        <div class="hidden lg:block absolute top-1/2 -right-12 text-2xl z-20 animate-float-bee" style="animation-delay: 0.5s;">🐝</div>
+                    </div>
+
+                    <div class="relative">
+                        <div class="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-amber-100 group h-full">
+                            <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">03</div>
+                            <div class="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mb-6 group-hover:from-amber-500 group-hover:to-orange-500 transition-all duration-300">
+                                <i data-lucide="handshake" class="w-8 h-8 text-amber-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Connect & Collaborate</h3>
+                            <p class="text-gray-600 leading-relaxed">Match with the perfect freelancer or client and start working together.</p>
+                        </div>
+                        <div class="hidden lg:block absolute top-1/2 -right-12 text-2xl z-20 animate-float-bee" style="animation-delay: 1s;">🐝</div>
+                    </div>
+
+                    <div class="relative">
+                        <div class="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-amber-100 group h-full">
+                            <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">04</div>
+                            <div class="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mb-6 group-hover:from-amber-500 group-hover:to-orange-500 transition-all duration-300">
+                                <i data-lucide="check-circle" class="w-8 h-8 text-amber-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">Complete & Get Paid</h3>
+                            <p class="text-gray-600 leading-relaxed">Deliver quality work, get paid securely, and build your reputation.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-16">
+                <a href="register.php" class="inline-block px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    Get Started Today
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gradient-to-br from-gray-900 via-gray-800 to-amber-900 text-white relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <!-- Main Footer Content -->
+            <div class="py-16 grid md:grid-cols-2 lg:grid-cols-6 gap-8">
+                <!-- Brand Column -->
+                <div class="lg:col-span-2">
+                    <div class="flex items-center gap-3 mb-6 hover:scale-105 transition-transform cursor-pointer">
+                        <svg class="w-10 h-10 fill-amber-400 stroke-amber-600 stroke-2" viewBox="0 0 24 24">
+                            <polygon points="12 2, 22 8.5, 22 15.5, 12 22, 2 15.5, 2 8.5"/>
+                        </svg>
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Task Hive</h3>
+                            <p class="text-xs text-amber-400 -mt-1">Find Your Buzz</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-400 mb-6 leading-relaxed">
+                        Join thousands of freelancers and clients building successful projects together. Your next opportunity is just a click away.
+                    </p>
+                    
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center gap-3 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer">
+                            <i data-lucide="mail" class="w-4 h-4"></i>
+                            <span>hello@taskhive.com</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer">
+                            <i data-lucide="phone" class="w-4 h-4"></i>
+                            <span>+1 (555) 123-4567</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer">
+                            <i data-lucide="map-pin" class="w-4 h-4"></i>
+                            <span>San Francisco, CA</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Link Columns -->
+                <div>
+                    <h4 class="text-lg font-bold text-white mb-4">For Freelancers</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Find Work</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Create Profile</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">How to Succeed</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Success Stories</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="text-lg font-bold text-white mb-4">For Clients</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Post a Job</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Find Talent</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Enterprise Solutions</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Pricing Plans</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="text-lg font-bold text-white mb-4">Resources</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Help Center</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Blog</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Community</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Guides & Tutorials</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="text-lg font-bold text-white mb-4">Company</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">About Us</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Careers</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Press</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Contact Us</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Newsletter Section -->
+            <div class="py-8 border-t border-gray-700">
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2">Stay in the Loop</h3>
+                        <p class="text-gray-400">
+                            Get the latest gigs, tips, and opportunities delivered to your inbox.
+                        </p>
+                    </div>
+                    <div>
+                        <div class="flex gap-2">
+                            <input type="email" placeholder="Enter your email" class="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition-colors">
+                            <button class="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105">
+                                Subscribe
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Bar -->
+            <div class="py-8 border-t border-gray-700">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <p class="text-gray-400 text-sm">© 2025 Task Hive. All rights reserved.</p>
+
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gradient-to-br hover:from-amber-500 hover:to-orange-500 transition-all duration-300 hover:scale-110">
+                            <i data-lucide="facebook" class="w-5 h-5"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gradient-to-br hover:from-amber-500 hover:to-orange-500 transition-all duration-300 hover:scale-110">
+                            <i data-lucide="twitter" class="w-5 h-5"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gradient-to-br hover:from-amber-500 hover:to-orange-500 transition-all duration-300 hover:scale-110">
+                            <i data-lucide="instagram" class="w-5 h-5"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gradient-to-br hover:from-amber-500 hover:to-orange-500 transition-all duration-300 hover:scale-110">
+                            <i data-lucide="linkedin" class="w-5 h-5"></i>
+                        </a>
+                    </div>
+
+                    <div class="flex items-center gap-6 text-sm">
+                        <a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Privacy Policy</a>
+                        <a href="#" class="text-gray-400 hover:text-amber-400 transition-colors">Terms of Service</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="absolute bottom-10 right-10 text-4xl animate-float-bee">🐝</div>
+    </footer>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Mobile Menu Toggle
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('active');
+        });
+
+        // Counter Animation
+        const counters = document.querySelectorAll('.counter');
+        
+        const observerOptions = {
+            threshold: 0.5,
+            rootMargin: '0px'
+        };
+
+        const counterObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const counter = entry.target;
+                    const target = parseInt(counter.getAttribute('data-target'));
+                    const duration = 2000; // 2 seconds
+                    const increment = target / (duration / 16); // 60fps
+                    let current = 0;
+
+                    const updateCounter = () => {
+                        current += increment;
+                        if (current < target) {
+                            counter.textContent = Math.floor(current).toLocaleString();
+                            requestAnimationFrame(updateCounter);
+                        } else {
+                            counter.textContent = target.toLocaleString();
+                        }
+                    };
+
+                    updateCounter();
+                    counterObserver.unobserve(counter);
+                }
+            });
+        }, observerOptions);
+
+        counters.forEach(counter => {
+            counterObserver.observe(counter);
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add scroll animation to elements
+        const observeElements = document.querySelectorAll('.hover-lift, .group');
+        
+        const fadeInObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        });
+
+        observeElements.forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            fadeInObserver.observe(el);
+        });
+
+        // Make logo clickable to go home
+        document.getElementById('logo')?.addEventListener('click', () => {
+            window.location.href = 'taskhive.php';
+        });
+
+        // CTA button navigation (desktop + mobile)
+        document.getElementById('btn-signin-desktop')?.addEventListener('click', () => {
+            window.location.href = 'login.php';
+        });
+        document.getElementById('btn-register-desktop')?.addEventListener('click', () => {
+            window.location.href = 'register.php';
+        });
+        document.getElementById('btn-signin-mobile')?.addEventListener('click', () => {
+            window.location.href = 'login.php';
+        });
+        document.getElementById('btn-register-mobile')?.addEventListener('click', () => {
+            window.location.href = 'register.php';
+        });
+
+        // Search behavior
+        const searchInput = document.getElementById('search-input');
+        const goSearch = () => {
+            const q = (searchInput?.value || '').trim();
+            const url = 'feed.php' + (q ? ('?q=' + encodeURIComponent(q)) : '');
+            window.location.href = url;
+        };
+        document.getElementById('search-btn')?.addEventListener('click', goSearch);
+        searchInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                goSearch();
+            }
+        });
+        document.querySelectorAll('.search-chip').forEach((chip) => {
+            chip.addEventListener('click', () => {
+                const q = chip.getAttribute('data-query') || chip.textContent.trim();
+                window.location.href = 'feed.php?q=' + encodeURIComponent(q);
+            });
+        });
+
+        // Category cards -> navigate with category filter
+        document.querySelectorAll('[data-category]').forEach((card) => {
+            card.addEventListener('click', () => {
+                const cat = card.getAttribute('data-category') || '';
+                window.location.href = 'feed.php?category=' + encodeURIComponent(cat);
+            });
+        });
+
+        // Notifications dropdown (desktop)
+        function toggleNotifications() {
+            const dd = document.getElementById('notifications-dropdown');
+            const pd = document.getElementById('profile-dropdown');
+            if (pd && !pd.classList.contains('hidden')) pd.classList.add('hidden');
+            if (dd) dd.classList.toggle('active');
+        }
+
+        function markAllAsRead() {
+            document.querySelectorAll('.notification-item').forEach(item => {
+                item.classList.remove('bg-blue-50/50');
+                const dot = item.querySelector('.bg-blue-500');
+                if (dot) dot.remove();
+            });
+            const badge = document.querySelector('button[title="Notifications"] .absolute.top-1.right-1');
+            if (badge) badge.remove();
+        }
+
+        // Profile dropdown (if present)
+        const profileBtn = document.getElementById('profile-btn');
+        const profileDropdown = document.getElementById('profile-dropdown');
+        const dropdownArrow = document.getElementById('dropdown-arrow');
+        if (profileBtn && profileDropdown) {
+            const toggleProfileDropdown = () => {
+                const isHidden = profileDropdown.classList.contains('hidden');
+                if (isHidden) {
+                    profileDropdown.classList.remove('hidden');
+                    dropdownArrow && (dropdownArrow.style.transform = 'rotate(180deg)');
+                } else {
+                    profileDropdown.classList.add('hidden');
+                    dropdownArrow && (dropdownArrow.style.transform = 'rotate(0deg)');
+                }
+            };
+            profileBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleProfileDropdown();
+            });
+            document.addEventListener('click', (e) => {
+                // Close notifications when clicking outside
+                const notifDd = document.getElementById('notifications-dropdown');
+                if (notifDd && notifDd.classList.contains('active') && !e.target.closest('#notifications-dropdown') && !e.target.closest('button[title="Notifications"]')) {
+                    notifDd.classList.remove('active');
+                }
+                if (!profileDropdown.classList.contains('hidden')) {
+                    // Close when clicking outside
+                    if (!e.target.closest('#profile-btn') && !e.target.closest('#profile-dropdown')) {
+                        profileDropdown.classList.add('hidden');
+                        dropdownArrow && (dropdownArrow.style.transform = 'rotate(0deg)');
+                    }
+                }
+            });
+        }
+    </script>
 
 </body>
 </html>
