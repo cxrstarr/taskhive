@@ -50,16 +50,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php if (!empty($error)): ?>
       <div class="mb-4 p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
-    <form method="post">
+    <form method="post" id="review-form">
       <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
-      <div class="flex items-center gap-2 mb-4">
-        <?php for ($i=1;$i<=5;$i++): ?>
-          <label class="inline-flex items-center gap-1 cursor-pointer">
-            <input type="radio" name="rating" value="<?= $i ?>" class="sr-only" />
-            <span class="w-8 h-8 inline-flex items-center justify-center rounded border border-amber-200 text-amber-600 hover:bg-amber-50"><?= $i ?></span>
-          </label>
-        <?php endfor; ?>
+      <div id="review-stars" class="flex items-center gap-2 mb-4" role="radiogroup" aria-label="Rating">
+        <!-- Built with JS below; 5 clickable stars -->
       </div>
+      <input type="hidden" name="rating" id="rating" value="0" />
 
       <label class="block text-sm font-medium text-gray-700 mb-2">Comment (optional)</label>
       <textarea name="comment" rows="5" class="w-full border border-amber-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-amber-500/30" placeholder="Share your experience..."></textarea>
@@ -70,5 +66,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
     </form>
   </div>
+  <script>
+    (function(){
+      const wrap = document.getElementById('review-stars');
+      const hidden = document.getElementById('rating');
+      if (!wrap || !hidden) return;
+      function buildStars(){
+        for (let i=1;i<=5;i++){
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'p-1';
+          btn.dataset.value = String(i);
+          btn.innerHTML = '<svg class="w-8 h-8 text-gray-300" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z"/></svg>';
+          btn.addEventListener('click', ()=> setRating(i));
+          wrap.appendChild(btn);
+        }
+        setRating(0);
+      }
+      function setRating(v){
+        hidden.value = String(v);
+        const icons = wrap.querySelectorAll('svg');
+        icons.forEach((svg, idx)=>{
+          const n = idx+1;
+          svg.classList.toggle('text-amber-500', n <= v);
+          svg.classList.toggle('text-gray-300', n > v);
+        });
+      }
+      buildStars();
+      const form = document.getElementById('review-form');
+      if (form) {
+        form.addEventListener('submit', (e)=>{
+          const v = parseInt(hidden.value||'0');
+          if (isNaN(v) || v < 1 || v > 5) {
+            e.preventDefault();
+            alert('Please select a rating from 1 to 5.');
+          }
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
