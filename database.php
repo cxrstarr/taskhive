@@ -250,9 +250,12 @@ class database {
         $pdo=$this->opencon();
         if ($search!==null && $search!=='') {
             $like='%'.$search.'%';
-            $sql="SELECT s.service_id,s.title,s.description,s.base_price,s.price_unit,s.slug,s.created_at,
+            $sql="SELECT s.service_id,s.title,s.description,s.base_price,s.price_unit,s.slug,s.created_at,s.category_id,
+                         c.name AS category_name,
+                         s.avg_rating,s.total_reviews,
                          u.user_id AS freelancer_id,u.first_name,u.last_name,u.profile_picture
                   FROM services s
+                  LEFT JOIN service_categories c ON c.category_id = s.category_id
                   JOIN users u ON s.freelancer_id=u.user_id
                   WHERE s.status='active' AND (s.title LIKE :qt OR s.description LIKE :qd)
                   ORDER BY s.created_at DESC
@@ -261,9 +264,12 @@ class database {
             $st->bindValue(':qt',$like,PDO::PARAM_STR);
             $st->bindValue(':qd',$like,PDO::PARAM_STR);
         } else {
-            $st=$pdo->prepare("SELECT s.service_id,s.title,s.description,s.base_price,s.price_unit,s.slug,s.created_at,
+            $st=$pdo->prepare("SELECT s.service_id,s.title,s.description,s.base_price,s.price_unit,s.slug,s.created_at,s.category_id,
+                                      c.name AS category_name,
+                                      s.avg_rating,s.total_reviews,
                                       u.user_id AS freelancer_id,u.first_name,u.last_name,u.profile_picture
                                FROM services s
+                               LEFT JOIN service_categories c ON c.category_id = s.category_id
                                JOIN users u ON s.freelancer_id=u.user_id
                                WHERE s.status='active'
                                ORDER BY s.created_at DESC
@@ -273,6 +279,16 @@ class database {
         $st->bindValue(':l',$limit,PDO::PARAM_INT);
         $st->execute();
         return $st->fetchAll();
+    }
+
+    // Map of category_id => name for service categories
+    function listServiceCategoryNames(): array {
+        $st = $this->opencon()->query("SELECT category_id,name FROM service_categories");
+        $map = [];
+        foreach ($st->fetchAll() as $row) {
+            $map[(int)$row['category_id']] = $row['name'];
+        }
+        return $map;
     }
     function countAllServices(?string $search=null): int {
         $pdo=$this->opencon();
@@ -305,25 +321,80 @@ class database {
         $ub=$this->getUser($userB);
         if (!$ua || !$ub) return false;
 
-        if ($ua['user_type'] !== $ub['user_type']) {
-            if ($ua['user_type']==='client') { $cid=$ua['user_id']; $fid=$ub['user_id']; }
-            elseif ($ub['user_type']==='client') { $cid=$ub['user_id']; $fid=$ua['user_id']; }
-            else { $cid=min($userA,$userB); $fid=max($userA,$userB); }
+        $typeA = (string)($ua['user_type'] ?? '');
+        $typeB = (string)($ub['user_type'] ?? '');
+
+        // Primary: client-freelancer mapping (original behavior)
+        if ($typeA === 'client' && $typeB === 'freelancer') {
+            $cid = (int)$ua['user_id'];
+            $fid = (int)$ub['user_id'];
+        } elseif ($typeA === 'freelancer' && $typeB === 'client') {
+            $cid = (int)$ub['user_id'];
+            $fid = (int)$ua['user_id'];
+        } elseif ($typeA === 'freelancer' && $typeB === 'freelancer') {
+            // New: allow freelancer-to-freelancer direct messaging by mapping the pair to (client_id, freelancer_id)
+            // in a stable order to ensure uniqueness independent of caller order.
+            $a = (int)$ua['user_id'];
+            $b = (int)$ub['user_id'];
+            $cid = min($a,$b);
+            $fid = max($a,$b);
         } else {
-            $cid=min($userA,$userB);
-            $fid=max($userA,$userB);
+            // client-client not supported at the moment
+            return false;
         }
 
         $pdo=$this->opencon();
+        // 1) Reuse ANY existing conversation for this pair (regardless of type)
         $sel=$pdo->prepare("SELECT conversation_id FROM conversations
-                            WHERE client_id=? AND freelancer_id=? AND conversation_type='general' LIMIT 1");
+                            WHERE client_id=? AND freelancer_id=?
+                            ORDER BY last_message_at DESC, created_at DESC, conversation_id DESC
+                            LIMIT 1");
         $sel->execute([$cid,$fid]);
         if ($row=$sel->fetch()) return (int)$row['conversation_id'];
 
-        $ins=$pdo->prepare("INSERT INTO conversations (conversation_type,client_id,freelancer_id,created_at)
-                            VALUES ('general',:c,:f,NOW())");
-        $ins->execute([':c'=>$cid,':f'=>$fid]);
-        return (int)$pdo->lastInsertId();
+        // 2) Best-effort: enforce uniqueness at DB level to avoid races
+        $this->ensureConversationPairUniqueIndex();
+
+        // 3) Create a single canonical 'general' conversation for the pair
+        try {
+            $ins=$pdo->prepare("INSERT INTO conversations (conversation_type,client_id,freelancer_id,created_at)
+                                VALUES ('general',:c,:f,NOW())");
+            $ins->execute([':c'=>$cid,':f'=>$fid]);
+            return (int)$pdo->lastInsertId();
+        } catch (Throwable $e) {
+            // If a concurrent request inserted it, select again
+            try {
+                $sel=$pdo->prepare("SELECT conversation_id FROM conversations
+                                    WHERE client_id=? AND freelancer_id=?
+                                    ORDER BY last_message_at DESC, created_at DESC, conversation_id DESC
+                                    LIMIT 1");
+                $sel->execute([$cid,$fid]);
+                if ($row=$sel->fetch()) return (int)$row['conversation_id'];
+            } catch (Throwable $e2) {}
+            return false;
+        }
+    }
+
+    // Ensure a unique index exists for (client_id,freelancer_id) to enforce one conversation per pair
+    private function ensureConversationPairUniqueIndex(): void {
+        try {
+            $pdo = $this->opencon();
+            // Create a unique index if it doesn't exist yet; ignore errors if it already exists
+            $pdo->query("CREATE UNIQUE INDEX IF NOT EXISTS uniq_conversations_pair ON conversations (client_id, freelancer_id)");
+        } catch (Throwable $e) {
+            // Some MySQL/MariaDB versions don't support IF NOT EXISTS on indexes; fallback: attempt to detect
+            try {
+                $pdo = $this->opencon();
+                $chk = $pdo->prepare("SHOW INDEX FROM conversations WHERE Key_name='uniq_conversations_pair'");
+                $chk->execute();
+                if (!$chk->fetch()) {
+                    // Try to add the index (may throw if duplicate rows exist)
+                    $pdo->query("ALTER TABLE conversations ADD UNIQUE KEY uniq_conversations_pair (client_id, freelancer_id)");
+                }
+            } catch (Throwable $e2) {
+                // Swallow; duplicate prevention will rely on SELECT-before-INSERT path
+            }
+        }
     }
     
     function addMessage(int $conversation_id,int $sender_id,string $body,string $type='text',?int $booking_id=null,$attachments=null): int|false {
@@ -347,6 +418,21 @@ class database {
         // Keep conversation "last" fields in sync with the same timestamp to avoid drift
         $pdo->prepare("UPDATE conversations SET last_message_id=:m, last_message_at=:created WHERE conversation_id=:c")
             ->execute([':m' => $mid, ':created' => $createdAt, ':c' => $conversation_id]);
+
+        // If any participant hid this conversation, automatically unhide it on new incoming messages
+        try {
+            $p = $pdo->prepare("SELECT client_id, freelancer_id FROM conversations WHERE conversation_id=:c LIMIT 1");
+            $p->execute([':c'=>$conversation_id]);
+            if ($row = $p->fetch()) {
+                $clientId = (int)$row['client_id'];
+                $freeId   = (int)$row['freelancer_id'];
+                // Unhide for both participants to ensure visibility resumes
+                $this->unhideConversationForUser($conversation_id, $clientId);
+                $this->unhideConversationForUser($conversation_id, $freeId);
+            }
+        } catch (Throwable $e) {
+            // best-effort; ignore failures
+        }
         return $mid;
     }
     function getConversationMessages(int $conversation_id,int $limit=50,int $offset=0): array {
@@ -361,46 +447,69 @@ class database {
         $st->execute();
         return $st->fetchAll();
     }
+
+    // Fetch messages older than a specific message_id (for lazy-load pagination)
+    function getConversationMessagesBeforeId(int $conversation_id, int $before_message_id, int $limit=50): array {
+        $limit = max(1, min(200, (int)$limit));
+        $st = $this->opencon()->prepare("SELECT m.*, u.first_name, u.last_name, u.profile_picture
+                                          FROM messages m
+                                          JOIN users u ON m.sender_id = u.user_id
+                                          WHERE m.conversation_id = :c AND m.message_id < :mid
+                                          ORDER BY m.message_id DESC
+                                          LIMIT :l");
+        $st->bindValue(':c', $conversation_id, PDO::PARAM_INT);
+        $st->bindValue(':mid', $before_message_id, PDO::PARAM_INT);
+        $st->bindValue(':l', $limit, PDO::PARAM_INT);
+        $st->execute();
+        return $st->fetchAll();
+    }
     function listConversationsWithUnread(int $user_id,int $limit=100,int $offset=0): array {
         $limit=max(1,(int)$limit);
         $offset=max(0,(int)$offset);
-        $sql="
-          SELECT
-            c.conversation_id,
-            c.conversation_type,
-            c.last_message_at,
-            c.booking_id,
-            c.client_id,
-            c.freelancer_id,
-            cl.first_name AS client_first,
-            cl.last_name  AS client_last,
-            cl.profile_picture AS client_pic,
-            fr.first_name AS free_first,
-            fr.last_name  AS free_last,
-            fr.profile_picture AS free_pic,
-            (SELECT m2.body
-             FROM messages m2
-             WHERE m2.conversation_id=c.conversation_id
-             ORDER BY m2.message_id DESC
-             LIMIT 1) AS last_body,
-            (SELECT COUNT(*)
-             FROM messages m3
-             WHERE m3.conversation_id=c.conversation_id
-               AND m3.sender_id <> :sub_sender
-               AND m3.read_at IS NULL) AS unread_count
-          FROM conversations c
-          JOIN users cl ON c.client_id=cl.user_id
-          JOIN users fr ON c.freelancer_id=fr.user_id
-          WHERE c.client_id=:outer_client
-             OR c.freelancer_id=:outer_freelancer
-          ORDER BY (c.last_message_at IS NULL) ASC,
-                   c.last_message_at DESC,
-                   c.created_at DESC
-          LIMIT $offset,$limit";
+                // Ensure optional visibility table exists (no-op if already there)
+                $this->ensureConversationUserStateTable();
+
+                $sql="
+                    SELECT
+                        c.conversation_id,
+                        c.conversation_type,
+                        c.last_message_at,
+                        c.booking_id,
+                        c.client_id,
+                        c.freelancer_id,
+                        cl.first_name AS client_first,
+                        cl.last_name  AS client_last,
+                        cl.profile_picture AS client_pic,
+                        fr.first_name AS free_first,
+                        fr.last_name  AS free_last,
+                        fr.profile_picture AS free_pic,
+                        (SELECT m2.body
+                         FROM messages m2
+                         WHERE m2.conversation_id=c.conversation_id
+                         ORDER BY m2.message_id DESC
+                         LIMIT 1) AS last_body,
+                        (SELECT COUNT(*)
+                         FROM messages m3
+                         WHERE m3.conversation_id=c.conversation_id
+                             AND m3.sender_id <> :sub_sender
+                             AND m3.read_at IS NULL) AS unread_count
+                    FROM conversations c
+                    JOIN users cl ON c.client_id=cl.user_id
+                    JOIN users fr ON c.freelancer_id=fr.user_id
+                    LEFT JOIN conversation_user_state cus
+                                 ON cus.conversation_id = c.conversation_id
+                                AND cus.user_id = :visibility_user
+                    WHERE (c.client_id=:outer_client OR c.freelancer_id=:outer_freelancer)
+                        AND (cus.hidden_at IS NULL)
+                    ORDER BY (c.last_message_at IS NULL) ASC,
+                                     c.last_message_at DESC,
+                                     c.created_at DESC
+                    LIMIT $offset,$limit";
         $st=$this->opencon()->prepare($sql);
         $st->bindValue(':sub_sender',$user_id,PDO::PARAM_INT);
         $st->bindValue(':outer_client',$user_id,PDO::PARAM_INT);
         $st->bindValue(':outer_freelancer',$user_id,PDO::PARAM_INT);
+                $st->bindValue(':visibility_user',$user_id,PDO::PARAM_INT);
         $st->execute();
         return $st->fetchAll();
     }
@@ -411,15 +520,17 @@ class database {
         $params = [':c'=>$client_id, ':f'=>$freelancer_id];
 
         if ($statuses && count($statuses)>0) {
-            // build IN list
-            $in = implode(',', array_fill(0, count($statuses), '?'));
+            // Build IN list with named placeholders to avoid mixing positional + named
+            $ph = [];
+            foreach (array_values($statuses) as $i => $s) {
+                $key = ":s{$i}";
+                $ph[] = $key;
+                $params[$key] = $s;
+            }
+            $in = implode(',', $ph);
             $sql = "SELECT booking_id FROM bookings WHERE $where AND status IN ($in) ORDER BY created_at DESC LIMIT 1";
             $st  = $pdo->prepare($sql);
-            $i=1;
-            $st->bindValue(':c',$client_id,PDO::PARAM_INT);
-            $st->bindValue(':f',$freelancer_id,PDO::PARAM_INT);
-            foreach ($statuses as $s) $st->bindValue($i++, $s);
-            $st->execute();
+            $st->execute($params);
         } else {
             $st = $pdo->prepare("SELECT booking_id FROM bookings WHERE $where ORDER BY created_at DESC LIMIT 1");
             $st->execute($params);
@@ -432,16 +543,24 @@ class database {
     }
 
     function countUnreadMessages(int $user_id): int {
+        // Exclude conversations the current user has hidden
+        // Use distinct placeholders to avoid HY093 when emulate prepares is disabled
+        $this->ensureConversationUserStateTable();
         $sql="SELECT COUNT(*)
               FROM messages m
               INNER JOIN conversations c ON m.conversation_id=c.conversation_id
+              LEFT JOIN conversation_user_state cus
+                     ON cus.conversation_id = c.conversation_id
+                    AND cus.user_id = :u1
               WHERE m.read_at IS NULL
-                AND m.sender_id <> :sender
-                AND (c.client_id = :as_client OR c.freelancer_id = :as_freelancer)";
+                AND m.sender_id <> :u2
+                AND (c.client_id = :u3 OR c.freelancer_id = :u4)
+                AND (cus.hidden_at IS NULL)";
         $st=$this->opencon()->prepare($sql);
-        $st->bindValue(':sender',$user_id,PDO::PARAM_INT);
-        $st->bindValue(':as_client',$user_id,PDO::PARAM_INT);
-        $st->bindValue(':as_freelancer',$user_id,PDO::PARAM_INT);
+        $st->bindValue(':u1',$user_id,PDO::PARAM_INT);
+        $st->bindValue(':u2',$user_id,PDO::PARAM_INT);
+        $st->bindValue(':u3',$user_id,PDO::PARAM_INT);
+        $st->bindValue(':u4',$user_id,PDO::PARAM_INT);
         $st->execute();
         return (int)$st->fetchColumn();
     }
@@ -758,15 +877,15 @@ class database {
         }
     }
 
-    // Expected amount per phase
-    $expected = match($phase){
-        'full_advance','postpaid_full' => (float)$b['total_amount'],
-        'downpayment' => round((float)$b['total_amount'] * ((float)$b['downpayment_percent']/100),2),
-        'balance'     => round((float)$b['total_amount'] - (float)$b['paid_upfront_amount'],2),
-        default       => null
-    };
-    if ($expected === null || $amount <= 0 || abs($expected - $amount) > 0.01) {
-        return "Payment amount mismatch (expected ₱".number_format((float)$expected,2).").";
+    // Allow partial payments: any amount > 0 up to remaining total
+    $totalAmount = (float)$b['total_amount'];
+    $totalPaid   = (float)$b['total_paid_amount'];
+    $remaining   = round(max(0.0, $totalAmount - $totalPaid), 2);
+    if ($amount <= 0 || $remaining <= 0) {
+        return "Nothing to pay.";
+    }
+    if ($amount - $remaining > 0.01) {
+        return "Amount exceeds remaining balance (₱".number_format($remaining,2).").";
     }
 
     $pdo = $this->opencon();
@@ -828,19 +947,27 @@ class database {
         $pst = $pdo->prepare($sql);
         $pst->execute($bindings);
 
-        // 2) Update booking financials without reusing the same named placeholder
+        // 2) Update booking financials allowing partial payments
         if (in_array($phase,['full_advance','downpayment'],true)) {
             $sqlUp = "UPDATE bookings
                       SET paid_upfront_amount = paid_upfront_amount + :amt1,
                           total_paid_amount   = total_paid_amount + :amt2,
-                          escrow_status='holding',
-                          payment_status='escrowed',
+                          escrow_status = CASE
+                              WHEN (total_paid_amount + :amt3) >= total_amount THEN 'holding'
+                              ELSE 'partial'
+                          END,
+                          payment_status = CASE
+                              WHEN (total_paid_amount + :amt4) >= total_amount THEN 'escrowed'
+                              ELSE 'partial'
+                          END,
                           updated_at=NOW()
                       WHERE booking_id=:bid";
             $upd = $pdo->prepare($sqlUp);
             $upd->execute([
                 ':amt1'=>$amount,
                 ':amt2'=>$amount,
+                ':amt3'=>$amount,
+                ':amt4'=>$amount,
                 ':bid'=>$booking_id
             ]);
         } else {
@@ -852,7 +979,7 @@ class database {
                           END,
                           payment_status = CASE
                               WHEN (total_paid_amount + :amt3) >= total_amount THEN 'escrowed'
-                              ELSE payment_status
+                              ELSE 'partial'
                           END,
                           updated_at=NOW()
                       WHERE booking_id=:bid";
@@ -871,6 +998,18 @@ class database {
             $payer_id,
             "Client paid ₱".number_format($amount,2)." (phase=$phase, method=$method)."
         );
+
+        // 3.1) Notification to the freelancer about the payment
+        try {
+            if (method_exists($this,'addNotification')) {
+                $this->addNotification((int)$b['freelancer_id'], 'payment_recorded', [
+                    'booking_id' => $booking_id,
+                    'amount' => $amount,
+                    'phase' => $phase,
+                    'method' => $method
+                ]);
+            }
+        } catch (Throwable $e) {}
 
         $this->commit();
         return true;
@@ -940,16 +1079,56 @@ class database {
                 ]);
             }
 
-            // Post to the general conversation between the pair
+            // Post a friendly system message to the general conversation between the pair
             $convId = $this->createOrGetGeneralConversation((int)$b['client_id'], (int)$b['freelancer_id']);
             if ($convId) {
-                $actorLabel=$actor_role==='freelancer'?'Freelancer':'Client';
-                $body="$actorLabel performed action '$action'. Booking now '$newStatus'.";
+                $serviceTitle = $b['service_title'] ?? ($b['title_snapshot'] ?? 'service');
+                $body = '';
+                if ($actor_role === 'freelancer') {
+                    $body = match ($action) {
+                        'accept'  => "Freelancer accepted your booking for \"{$serviceTitle}\" (Booking #{$booking_id}).",
+                        'reject'  => "Freelancer declined your booking for \"{$serviceTitle}\" (Booking #{$booking_id}).",
+                        'start'   => "Freelancer started working on \"{$serviceTitle}\" (Booking #{$booking_id}).",
+                        'deliver' => "Freelancer marked \"{$serviceTitle}\" as delivered for your review (Booking #{$booking_id}).",
+                        'complete'=> "Freelancer completed \"{$serviceTitle}\" (Booking #{$booking_id}).",
+                        default   => "Freelancer updated your booking (Booking #{$booking_id}) — status: {$newStatus}.",
+                    };
+                } else {
+                    // Client-initiated actions also get a clear message to freelancer
+                    $body = match ($action) {
+                        'approve_delivery' => "Client approved the delivery for \"{$serviceTitle}\" (Booking #{$booking_id}).",
+                        'cancel'           => "Client canceled the booking for \"{$serviceTitle}\" (Booking #{$booking_id}).",
+                        default            => "Client updated the booking (Booking #{$booking_id}) — status: {$newStatus}.",
+                    };
+                }
                 $this->addMessage($convId,$actor_id,$body,'system',$booking_id);
             }
         } catch(Throwable $e){}
 
         if ($newStatus==='completed') {
+            // Post a friendly system message to prompt the client to leave a review
+            try {
+                $serviceTitle = $b['service_title'] ?? ($b['title_snapshot'] ?? 'service');
+                $freelancerName = $b['freelancer_name'] ?? 'the freelancer';
+                $url = 'leave_review.php?booking_id='.(int)$booking_id;
+                $prompt = "Booking #{$booking_id} for \"{$serviceTitle}\" is completed. Client: please leave a review for {$freelancerName} to help the community. <a href=\"{$url}\" class=\"leave-review-link inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-600 text-white hover:bg-amber-700 transition-colors\" data-booking-id=\"{$booking_id}\"><svg xmlns=\"http://www.w3.org/2000/svg\" class=\"h-4 w-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M5 13l4 4L19 7\" /></svg>Leave a review</a>.";
+                $this->systemBookingMessage($booking_id, (int)$b['client_id'], $prompt);
+            } catch (Throwable $e) { /* ignore */ }
+
+            // Notify the client in notifications center as well
+            try {
+                if (method_exists($this,'addNotification')) {
+                    $this->addNotification((int)$b['client_id'], 'review_prompt', [
+                        'booking_id'    => (int)$booking_id,
+                        'service_id'    => (int)($b['service_id'] ?? 0),
+                        'freelancer_id' => (int)($b['freelancer_id'] ?? 0),
+                        'service_title' => (string)($serviceTitle ?? ''),
+                        'freelancer_name' => (string)($freelancerName ?? ''),
+                        'url'           => (string)$url
+                    ]);
+                }
+            } catch (Throwable $e) { /* ignore */ }
+
             $this->releaseFundsIfEligible($booking_id,$actor_id);
         }
 
@@ -1051,9 +1230,12 @@ class database {
         ]);
     }
     function getFreelancerReviews(int $freelancer_id,int $limit=20): array {
-        $st=$this->opencon()->prepare("SELECT rv.*,u.first_name,u.last_name
+        $st=$this->opencon()->prepare("SELECT rv.*,u.first_name,u.last_name,u.profile_picture,
+                                              s.title AS service_title
                                        FROM reviews rv
                                        JOIN users u ON rv.reviewer_id=u.user_id
+                                       LEFT JOIN bookings b ON rv.booking_id=b.booking_id
+                                       LEFT JOIN services s ON b.service_id=s.service_id
                                        WHERE rv.reviewee_id=:f
                                        ORDER BY rv.created_at DESC
                                        LIMIT :l");
@@ -1063,11 +1245,167 @@ class database {
         return $st->fetchAll();
     }
 
+    // Batch fetch: recent reviews grouped by service for the provided service IDs
+    // Returns array: [service_id => [ {review_id, service_id, rating, comment, created_at, reviewer_id, reviewer_name}... ]]
+    function getRecentServiceReviews(array $serviceIds, int $perService=2, int $maxTotal=300): array {
+        $result = [];
+        $ids = array_values(array_unique(array_map('intval', $serviceIds)));
+        if (count($ids) === 0) return $result;
+
+        // Cap limits sanely
+        $perService = max(1, min(10, (int)$perService));
+        $maxTotal = max(10, min(1000, (int)$maxTotal));
+
+        // Build IN clause placeholders
+        $ph = [];$params = [];
+        foreach ($ids as $i => $id) { $key = ":s{$i}"; $ph[] = $key; $params[$key] = $id; }
+        $in = implode(',', $ph);
+
+        // Heuristic overall limit to avoid fetching too many rows
+        $overallLim = min($maxTotal, $perService * count($ids) * 3);
+
+        $sql = "SELECT r.review_id, r.rating, r.comment, r.created_at, r.reviewer_id,
+                       b.service_id,
+                       u.first_name, u.last_name
+                FROM reviews r
+                JOIN bookings b ON r.booking_id = b.booking_id
+                JOIN users u ON r.reviewer_id = u.user_id
+                WHERE b.service_id IN ($in)
+                ORDER BY r.created_at DESC
+                LIMIT :lim";
+        $pdo = $this->opencon();
+        $st = $pdo->prepare($sql);
+        foreach ($params as $k => $v) { $st->bindValue($k, $v, PDO::PARAM_INT); }
+        $st->bindValue(':lim', $overallLim, PDO::PARAM_INT);
+        $st->execute();
+        while ($row = $st->fetch()) {
+            $sid = (int)$row['service_id'];
+            if (!isset($result[$sid])) $result[$sid] = [];
+            if (count($result[$sid]) >= $perService) continue; // enforce per-service cap
+            $name = trim((string)($row['first_name'] ?? '') . ' ' . (string)($row['last_name'] ?? ''));
+            $result[$sid][] = [
+                'review_id'    => (int)$row['review_id'],
+                'service_id'   => $sid,
+                'rating'       => (int)$row['rating'],
+                'comment'      => (string)($row['comment'] ?? ''),
+                'created_at'   => (string)$row['created_at'],
+                'reviewer_id'  => (int)$row['reviewer_id'],
+                'reviewer_name'=> $name !== '' ? $name : 'User'
+            ];
+        }
+        return $result;
+    }
+
+    // Batch compute aggregates for services: total reviews, sum of stars, average rating
+    function getServiceReviewAggregates(array $serviceIds): array {
+        $map = [];
+        $ids = array_values(array_unique(array_map('intval', $serviceIds)));
+        if (count($ids) === 0) return $map;
+
+        $ph = [];$params = [];
+        foreach ($ids as $i => $id) { $k = ":s{$i}"; $ph[] = $k; $params[$k] = $id; }
+        $in = implode(',', $ph);
+        $sql = "SELECT b.service_id,
+                       COUNT(*) AS total_reviews,
+                       SUM(r.rating) AS sum_stars,
+                       AVG(r.rating) AS avg_rating
+                FROM reviews r
+                JOIN bookings b ON r.booking_id = b.booking_id
+                WHERE b.service_id IN ($in)
+                GROUP BY b.service_id";
+        $pdo = $this->opencon();
+        $st = $pdo->prepare($sql);
+        foreach ($params as $k=>$v) { $st->bindValue($k, $v, PDO::PARAM_INT); }
+        $st->execute();
+        while ($row = $st->fetch()) {
+            $sid = (int)$row['service_id'];
+            $total = (int)$row['total_reviews'];
+            $sum = (float)($row['sum_stars'] ?? 0);
+            $avg = $total > 0 ? (float)$row['avg_rating'] : 0.0;
+            $map[$sid] = [
+                'total_reviews' => $total,
+                'sum_stars'     => $sum,
+                'avg_rating'    => $avg,
+            ];
+        }
+        return $map;
+    }
+
     /* ---------------- NOTIFICATIONS ---------------- */
     function addNotification(int $user_id,string $type,array $data=[]): bool {
         $st=$this->opencon()->prepare("INSERT INTO notifications (user_id,type,data,created_at)
                                        VALUES (:u,:t,:d,NOW())");
         return $st->execute([':u'=>$user_id,':t'=>$type,':d'=>json_encode($data)]);
+    }
+
+    /* ---------------- CONVERSATION VISIBILITY (PER-USER) ---------------- */
+    private function ensureConversationUserStateTable(): void {
+        try {
+            $this->opencon()->query("CREATE TABLE IF NOT EXISTS conversation_user_state (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                conversation_id BIGINT UNSIGNED NOT NULL,
+                user_id BIGINT UNSIGNED NOT NULL,
+                hidden_at DATETIME NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY uniq_conv_user (conversation_id, user_id),
+                KEY idx_user_hidden (user_id, hidden_at),
+                CONSTRAINT fk_cus_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+                CONSTRAINT fk_cus_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+        } catch (Throwable $e) {
+            // Best-effort; ignore if lacking permissions; features depending on it may degrade
+        }
+    }
+
+    function userInConversation(int $user_id, int $conversation_id): bool {
+        // Use distinct placeholders for the same value to avoid HY093 with native prepares
+        $st = $this->opencon()->prepare("SELECT 1 FROM conversations WHERE conversation_id=:c AND (client_id=:u1 OR freelancer_id=:u2) LIMIT 1");
+        $st->execute([':c'=>$conversation_id, ':u1'=>$user_id, ':u2'=>$user_id]);
+        return (bool)$st->fetchColumn();
+    }
+
+    function hideConversationForUser(int $conversation_id, int $user_id): bool|string {
+        $this->ensureConversationUserStateTable();
+        if (!$this->userInConversation($user_id, $conversation_id)) return "Not a participant.";
+        $sql = "INSERT INTO conversation_user_state (conversation_id, user_id, hidden_at)
+                VALUES (:c,:u,NOW())
+                ON DUPLICATE KEY UPDATE hidden_at=VALUES(hidden_at)";
+        $pdo = $this->opencon();
+        try {
+            $st = $pdo->prepare($sql);
+            $ok = $st->execute([':c'=>$conversation_id, ':u'=>$user_id]);
+            return $ok ? true : "Failed to hide conversation.";
+        } catch (PDOException $e) {
+            // If table is missing for any reason, attempt to create and retry once
+            $msg = $e->getMessage();
+            if (strpos($msg, 'Base table or view not found') !== false || strpos($msg, '1146') !== false) {
+                try {
+                    $this->ensureConversationUserStateTable();
+                    $st = $pdo->prepare($sql);
+                    $ok = $st->execute([':c'=>$conversation_id, ':u'=>$user_id]);
+                    return $ok ? true : "Failed to hide conversation.";
+                } catch (Throwable $e2) {
+                    return "Failed to hide conversation: ".$e2->getMessage();
+                }
+            }
+            return "Failed to hide conversation: ".$e->getMessage();
+        }
+    }
+
+    function unhideConversationForUser(int $conversation_id, int $user_id): bool|string {
+        $this->ensureConversationUserStateTable();
+        if (!$this->userInConversation($user_id, $conversation_id)) return "Not a participant.";
+        $sql = "INSERT INTO conversation_user_state (conversation_id, user_id, hidden_at)
+                VALUES (:c,:u,NULL)
+                ON DUPLICATE KEY UPDATE hidden_at=NULL";
+        $pdo = $this->opencon();
+        try {
+            $st = $pdo->prepare($sql);
+            $ok = $st->execute([':c'=>$conversation_id, ':u'=>$user_id]);
+            return $ok ? true : "Failed to unhide conversation.";
+        } catch (Throwable $e) {
+            return "Failed to unhide conversation: ".$e->getMessage();
+        }
     }
 
     /* ------------ FREELANCER PAYMENT METHODS ------------ */

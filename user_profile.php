@@ -20,6 +20,18 @@ if (!$public) {
 $isSelf = $viewer_id === $profile_id;
 $canMessage = $viewer_id && !$isSelf;
 
+// If viewing own public profile, redirect to the appropriate dashboard/profile
+if ($isSelf) {
+  $ut = strtolower((string)($public['user_type'] ?? ''));
+  if ($ut === 'freelancer') {
+    header('Location: freelancer_profile.php?id='.(int)$profile_id);
+    exit;
+  } else {
+    header('Location: client_profile.php');
+    exit;
+  }
+}
+
 $skills = [];
 if (($public['user_type'] ?? '') === 'freelancer' && !empty($public['skills'])) {
     $skills = array_filter(array_map('trim', explode(',', $public['skills'])));

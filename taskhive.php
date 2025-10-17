@@ -4,6 +4,8 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/database.php';
 $db = new database();
 $currentUser = null;
+// Navbar notifications list
+$notifications = [];
 if (!empty($_SESSION['user_id'])) {
     $u = $db->getUser((int)$_SESSION['user_id']);
     if ($u) {
@@ -14,6 +16,43 @@ if (!empty($_SESSION['user_id'])) {
             'avatar' => $u['profile_picture'] ?: 'img/profile_icon.webp',
             'type'   => $u['user_type'] ?? null,
         ];
+        // Load latest 10 notifications for the logged-in user
+        try {
+            $pdo = $db->opencon();
+            $stN = $pdo->prepare("SELECT notification_id,type,data,created_at,read_at FROM notifications WHERE user_id=:u ORDER BY created_at DESC LIMIT 10");
+            $stN->execute([':u' => (int)$currentUser['id']]);
+            foreach ($stN->fetchAll() as $n) {
+                $type = (string)$n['type'];
+                $data = [];
+                if (!empty($n['data'])) {
+                    $d = json_decode($n['data'], true);
+                    if (is_array($d)) $data = $d;
+                }
+                $msg = ucfirst(str_replace('_',' ', $type)) . ' update';
+                if (($type === 'system' || $type === 'admin_message') && isset($data['text'])) {
+                    $msg = 'System: ' . (string)$data['text'];
+                } elseif ($type === 'booking_status_changed' && isset($data['status'], $data['booking_id'])) {
+                    $msg = "Booking #{$data['booking_id']} status: ".ucfirst(str_replace('_',' ', $data['status']));
+                } elseif ($type === 'booking_created' && isset($data['booking_id'])) {
+                    $msg = "Booking #{$data['booking_id']} was created.";
+                } elseif ($type === 'payment_recorded' && isset($data['amount'])) {
+                    $msg = 'Payment received: \u20b1'.number_format((float)$data['amount'],2);
+                } elseif ($type === 'service_rejected') {
+                    $reason = isset($data['reason']) && $data['reason'] !== '' ? (string)$data['reason'] : '';
+                    $title  = isset($data['title']) && $data['title'] !== '' ? (string)$data['title'] : '';
+                    $msg = 'Service Approval: Rejected' . ($reason !== '' ? ' — ' . $reason : '') . ($title !== '' ? ' (' . $title . ')' : '');
+                } elseif ($type === 'service_approved') {
+                    $title  = isset($data['title']) && $data['title'] !== '' ? (string)$data['title'] : '';
+                    $msg = 'Service Approval: Approved' . ($title !== '' ? ' — ' . $title : '');
+                }
+                $notifications[] = [
+                    'id' => (int)$n['notification_id'],
+                    'message' => $msg,
+                    'time' => date('M d, Y g:i A', strtotime($n['created_at'] ?? date('Y-m-d H:i:s'))),
+                    'unread' => empty($n['read_at']),
+                ];
+            }
+        } catch (Throwable $e) { /* ignore */ }
     }
 }
 ?>
@@ -98,6 +137,11 @@ if (!empty($_SESSION['user_id'])) {
         .mobile-menu.active {
             max-height: 500px;
         }
+        
+        /* Notifications dropdown animation and visibility */
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .dropdown { display: none; opacity: 0; }
+        .dropdown.active { display: block; animation: slideDown 0.2s ease-out forwards; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
@@ -128,7 +172,7 @@ if (!empty($_SESSION['user_id'])) {
                         Find Gigs
                         <span class="absolute -bottom-1 left-0 h-0.5 bg-amber-500 w-0 group-hover:w-full transition-all duration-300"></span>
                     </a>
-                    <a href="freelancer_dashboard.php" class="text-gray-700 hover:text-amber-600 transition-colors relative group">
+                    <a href="dashboard.php" class="text-gray-700 hover:text-amber-600 transition-colors relative group">
                         Post a Task
                         <span class="absolute -bottom-1 left-0 h-0.5 bg-amber-500 w-0 group-hover:w-full transition-all duration-300"></span>
                     </a>
@@ -142,10 +186,37 @@ if (!empty($_SESSION['user_id'])) {
                 <div class="hidden md:flex items-center gap-4">
                     <?php if ($currentUser): ?>
                         <!-- Notifications -->
-                        <button class="relative p-2 hover:bg-amber-100 rounded-full transition-colors hover:scale-105" title="Notifications">
-                            <i data-lucide="bell" class="w-5 h-5 text-gray-700"></i>
-                            <span class="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
-                        </button>
+                        <div class="relative">
+                            <button onclick="toggleNotifications()" class="relative p-2 hover:bg-amber-100 rounded-full transition-colors hover:scale-105" title="Notifications">
+                                <i data-lucide="bell" class="w-5 h-5 text-gray-700"></i>
+                                <span class="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
+                            </button>
+
+                            <div id="notifications-dropdown" class="dropdown absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-amber-200 overflow-hidden">
+                                <div class="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-b border-amber-200 flex items-center justify-between">
+                                    <h3 class="font-bold text-gray-900">Notifications</h3>
+                                    <button onclick="markAllAsRead()" class="text-xs text-amber-600 hover:text-amber-700 font-medium">Mark all as read</button>
+                                </div>
+                                <div class="max-h-96 overflow-y-auto">
+                                    <?php foreach ($notifications as $notif): ?>
+                                        <div class="notification-item p-4 border-b border-amber-100 <?php echo $notif['unread'] ? 'bg-blue-50/50' : ''; ?>">
+                                            <div class="flex items-start gap-3">
+                                                <?php if ($notif['unread']): ?>
+                                                    <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                                <?php endif; ?>
+                                                <div class="flex-1">
+                                                    <p class="text-sm text-gray-800"><?php echo htmlspecialchars($notif['message']); ?></p>
+                                                    <p class="text-xs text-gray-500 mt-1"><?php echo htmlspecialchars($notif['time']); ?></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                    <?php if (!count($notifications)): ?>
+                                        <div class="p-4 text-sm text-gray-600">No notifications</div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Profile Dropdown Trigger -->
                         <div class="relative">
@@ -171,9 +242,13 @@ if (!empty($_SESSION['user_id'])) {
                                 </div>
                                 <!-- Menu Items -->
                                 <div class="py-2">
-                                    <a href="client_dashboard.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
+                                    <a href="dashboard.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
                                         <i data-lucide="user" class="w-5 h-5 text-amber-600"></i>
-                                        <span>View Profile</span>
+                                        <span>View Dashboard</span>
+                                    </a>
+                                    <a href="settings.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
+                                        <i data-lucide="settings" class="w-5 h-5 text-amber-600"></i>
+                                        <span>Settings</span>
                                     </a>
                                     <div class="my-2 border-t border-gray-200"></div>
                                     <a href="logout.php" class="flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 hover:translate-x-1 transition-all">
@@ -216,7 +291,8 @@ if (!empty($_SESSION['user_id'])) {
                                 <div class="text-xs text-gray-600"><?php echo htmlspecialchars($currentUser['email']); ?></div>
                             </div>
                         </div>
-                        <a href="user_profile.php" class="block w-full text-center py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">View Profile</a>
+                        <a href="dashboard.php" class="block w-full text-center py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">View Dashboard</a>
+                        <a href="settings.php" class="block w-full text-center py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">Settings</a>
                         <a href="logout.php" class="block w-full text-center py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-full shadow-lg">Logout</a>
                     <?php else: ?>
                         <button id="btn-signin-mobile" class="w-full py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">Sign In</button>
@@ -891,6 +967,24 @@ if (!empty($_SESSION['user_id'])) {
             });
         });
 
+        // Notifications dropdown (desktop)
+        function toggleNotifications() {
+            const dd = document.getElementById('notifications-dropdown');
+            const pd = document.getElementById('profile-dropdown');
+            if (pd && !pd.classList.contains('hidden')) pd.classList.add('hidden');
+            if (dd) dd.classList.toggle('active');
+        }
+
+        function markAllAsRead() {
+            document.querySelectorAll('.notification-item').forEach(item => {
+                item.classList.remove('bg-blue-50/50');
+                const dot = item.querySelector('.bg-blue-500');
+                if (dot) dot.remove();
+            });
+            const badge = document.querySelector('button[title="Notifications"] .absolute.top-1.right-1');
+            if (badge) badge.remove();
+        }
+
         // Profile dropdown (if present)
         const profileBtn = document.getElementById('profile-btn');
         const profileDropdown = document.getElementById('profile-dropdown');
@@ -911,6 +1005,11 @@ if (!empty($_SESSION['user_id'])) {
                 toggleProfileDropdown();
             });
             document.addEventListener('click', (e) => {
+                // Close notifications when clicking outside
+                const notifDd = document.getElementById('notifications-dropdown');
+                if (notifDd && notifDd.classList.contains('active') && !e.target.closest('#notifications-dropdown') && !e.target.closest('button[title="Notifications"]')) {
+                    notifDd.classList.remove('active');
+                }
                 if (!profileDropdown.classList.contains('hidden')) {
                     // Close when clicking outside
                     if (!e.target.closest('#profile-btn') && !e.target.closest('#profile-dropdown')) {

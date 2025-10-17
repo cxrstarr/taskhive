@@ -34,29 +34,12 @@ if ($booking['status'] !== 'pending') {
     header("Location: freelancer_profile.php"); exit;
 }
 
-$newStatus = $action === 'accept' ? 'accepted' : 'rejected';
-if ($db->updateBookingStatus($booking_id,$newStatus)) {
-
-    // Add notification for client
-    if (method_exists($db,'addNotification')) {
-        $db->addNotification((int)$booking['client_id'],'booking_status_changed',[
-            'booking_id'=>$booking_id,
-            'status'=>$newStatus
-        ]);
-    }
-
-    // Add message to the general conversation (single thread per pair)
-    try {
-        $conv_id = $db->createOrGetGeneralConversation((int)$booking['client_id'], $freelancer_id);
-        if ($conv_id) {
-            $msg = "Freelancer has ".($action==='accept'?'ACCEPTED':'REJECTED')." booking #$booking_id.";
-            $db->addMessage((int)$conv_id,$freelancer_id,$msg,'system',$booking_id);
-        }
-    } catch (Throwable $e) {}
-
-    flash_set('success','Booking '.$newStatus.'.');
+// Use unified handler so notifications and system messages are consistent
+$res = $db->performBookingAction($booking_id, $freelancer_id, 'freelancer', $action);
+if ($res === true) {
+    flash_set('success','Booking '.($action==='accept'?'accepted':'rejected').'.');
 } else {
-    flash_set('error','Could not update booking status.');
+    flash_set('error', is_string($res) ? $res : 'Could not update booking status.');
 }
 
 header("Location: freelancer_profile.php");

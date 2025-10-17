@@ -34,4 +34,6 @@ if (!$conv_id) {
 }
 
 flash_set('success','Conversation ready.');
-header("Location: conversation.php?id=".$conv_id);
+// Redirect to inbox focused on this conversation and user
+$redir = 'inbox.php?user_id='.urlencode((string)$target_id).'&conversation_id='.urlencode((string)$conv_id);
+header('Location: '.$redir);

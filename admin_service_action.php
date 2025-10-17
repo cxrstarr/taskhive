@@ -12,8 +12,12 @@ $pdo = $db->opencon();
 $service_id = (int)($_POST['service_id'] ?? 0);
 $action = $_POST['action'] ?? '';
 $reason = trim($_POST['reason'] ?? '');
+$service_ids = isset($_POST['service_ids']) && is_array($_POST['service_ids']) ? array_values(array_unique(array_map('intval', $_POST['service_ids']))) : [];
+// Rejects should send the service back to draft (no delete in this flow)
 
-if ($service_id <= 0 || !in_array($action, ['approve','reject','archive','delete','flag','unflag'], true)) {
+// Allow bulk actions with no single service_id
+$allowed = ['approve','reject','archive','delete','flag','unflag','bulk_approve','bulk_reject'];
+if ((!$service_id && empty($service_ids)) || !in_array($action, $allowed, true)) {
   flash_set('error', 'Invalid request.');
   header('Location: ' . (!empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'admin_dashboard.php?view=services'));
   exit;
@@ -33,6 +37,59 @@ function log_admin_action($pdo, $adminId, $action, $targetType, $targetId, $chan
 }
 
 try {
+  // Bulk actions handler
+  if ($action === 'bulk_approve' || $action === 'bulk_reject') {
+    if (!$service_ids) { throw new Exception('No services selected.'); }
+    $pdo->beginTransaction();
+    if ($action === 'bulk_approve') {
+      $up = $pdo->prepare("UPDATE services SET status='active', flagged=0, flagged_reason=NULL, flagged_at=NULL WHERE service_id=? LIMIT 1");
+      $sel = $pdo->prepare("SELECT freelancer_id,title FROM services WHERE service_id=? LIMIT 1");
+      foreach ($service_ids as $sid) {
+        $up->execute([$sid]);
+        try {
+          $sel->execute([$sid]);
+          if ($svc = $sel->fetch()) {
+            if (method_exists($db,'addNotification')) {
+              $db->addNotification((int)$svc['freelancer_id'], 'service_approved', [
+                'service_id'=>$sid,
+                'title'=>$svc['title'],
+                'status'=>'active'
+              ]);
+            }
+          }
+        } catch (Throwable $e) { /* ignore per-item */ }
+        log_admin_action($pdo, (int)$_SESSION['user_id'], 'service_approve', 'service', $sid);
+      }
+      $pdo->commit();
+      flash_set('success', 'Selected services approved.');
+    } else { // bulk_reject
+      $up = $pdo->prepare("UPDATE services SET status='draft', flagged=IFNULL(flagged,0), flagged_reason=IF(?<>'',?,flagged_reason), flagged_at=NOW() WHERE service_id=? LIMIT 1");
+      $sel = $pdo->prepare("SELECT freelancer_id,title FROM services WHERE service_id=? LIMIT 1");
+      foreach ($service_ids as $sid) {
+        $up->execute([$reason, $reason, $sid]);
+        try {
+          $sel->execute([$sid]);
+          if ($svc = $sel->fetch()) {
+            if (method_exists($db,'addNotification')) {
+              $db->addNotification((int)$svc['freelancer_id'], 'service_rejected', [
+                'service_id'=>$sid,
+                'title'=>$svc['title'],
+                'status'=>'draft',
+                'reason'=>$reason ?: null
+              ]);
+            }
+          }
+        } catch (Throwable $e) { /* ignore per-item */ }
+        log_admin_action($pdo, (int)$_SESSION['user_id'], 'service_reject', 'service', $sid, ['reason' => $reason]);
+      }
+      $pdo->commit();
+      flash_set('success', 'Selected services rejected to draft.');
+    }
+    $back = !empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'admin_dashboard.php?view=service_queue';
+    header("Location: $back");
+    exit;
+  }
+
   switch ($action) {
     case 'approve':
       // Approve and make active; also clear flags if any
@@ -57,9 +114,9 @@ try {
       break;
 
     case 'reject':
-      // Move back to draft so freelancer cannot self-activate; keep optional reason in flagged fields if provided
-      $stmt = $pdo->prepare("UPDATE services SET status='draft', flagged=IFNULL(flagged,0), flagged_reason=IF(?<>'',?,flagged_reason), flagged_at=IF(?<>'',NOW(),flagged_at) WHERE service_id=? LIMIT 1");
-      $stmt->execute([$reason, $reason, $reason, $service_id]);
+      // Move back to draft and mark reviewed; always set flagged_at so it drops from the approval queue
+      $stmt = $pdo->prepare("UPDATE services SET status='draft', flagged=IFNULL(flagged,0), flagged_reason=IF(?<>'',?,flagged_reason), flagged_at=NOW() WHERE service_id=? LIMIT 1");
+      $stmt->execute([$reason, $reason, $service_id]);
       // Notify freelancer about rejection/returned to draft
       try {
         $row = $pdo->prepare("SELECT freelancer_id,title FROM services WHERE service_id=? LIMIT 1");

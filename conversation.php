@@ -119,7 +119,7 @@ if ($selectedId > 0) {
 
         // Load messages (ascending for chat)
         try {
-            $msgs = $db->getConversationMessages($selectedId, 200, 0);
+      $msgs = $db->getConversationMessages($selectedId, 40, 0);
             // Ensure ascending order
             if (!empty($msgs)) {
                 // Try to infer order: if first created_at > last, reverse
@@ -165,7 +165,7 @@ if ($selectedId > 0) {
     }
     .inbox-grid {
       display: grid;
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 300px 1fr; /* narrower sidebar -> wider chat/input */
       gap: 0;
       height: 100%; /* fill parent fixed height */
     }
@@ -174,7 +174,7 @@ if ($selectedId > 0) {
       border-right: 1px solid #F3F4F6;
       height: 100%;
       overflow: auto; /* independent scroll for contacts list */
-      padding: 0.75rem;
+      padding: 1rem; /* match feed spacing */
       background: #fff;
       border-top-left-radius: .75rem;
       border-bottom-left-radius: .75rem;
@@ -188,7 +188,7 @@ if ($selectedId > 0) {
       border-bottom-right-radius: .75rem;
     }
     .chat-header {
-      padding: 1rem 1.125rem;
+      padding: 1rem 1.25rem; /* match feed spacing */
       border-bottom: 1px solid #F3F4F6;
       display: flex; align-items: center; gap: .75rem;
       background: #fff;
@@ -199,16 +199,16 @@ if ($selectedId > 0) {
       flex: 1 1 auto;           /* take remaining vertical space */
       min-height: 0;
       overflow: auto;            /* independent scroll for messages */
-      padding: 1rem;
+      padding: 1.25rem;          /* a bit more breathing room like feed */
       background: #FFFBEB;
     }
 
     .composer {
-      padding: 0.875rem;
+      padding: 1rem 1.125rem;    /* match feed spacing */
       border-top: 1px solid #F3F4F6;
       background: white;
       display: flex;
-      gap: 0.5rem;               /* NEW: slightly tighter gap to give input more space */
+      gap: 0.75rem;              /* comfortable spacing */
       align-items: center;
       border-bottom-right-radius: .75rem;
       flex: 0 0 auto;
@@ -222,18 +222,29 @@ if ($selectedId > 0) {
       flex: 1 1 auto;
       min-width: 0;              /* allow flex shrinking so it uses all available space */
       width: 100%;               /* ensure it stretches end-to-end in its track */
+      border:2px solid #E5E7EB; border-radius:0.75rem; padding:1rem 1.125rem;
+      font-size: 1.0625rem; line-height: 1.5;
+      min-height: 96px;          /* bigger default height */
+      max-height: 280px;         /* keep it sensible */
+      resize: none;              /* handled via JS autosize */
+      background: #fff;
     }
+    .composer .btn.btn-primary { white-space: nowrap; }
     .composer > label { flex: 0 0 auto; }
     .composer > button[type="submit"] { flex: 0 0 auto; }
 
     .avatar, .inbox-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border:2px solid #FDE68A; }
     .message-item {
-      padding: 0.75rem;
+      padding: 0.875rem;         /* slightly larger to match feed */
       border: 1px solid #F3F4F6;
       border-radius: 0.75rem;
       background: #fff;
       margin-bottom: 0.5rem;
       cursor: pointer;
+    }
+    .message-item.selected {
+      background: #FFFBEB;       /* subtle active feel, matches feed palette */
+      border-color: #FDE68A;
     }
     .message-item .sender-name { font-weight: 600; color: #374151; }
     .message-item .message-snippet { font-size: .9rem; color: #6B7280; }
@@ -336,6 +347,9 @@ if ($selectedId > 0) {
 
             <!-- Messages -->
             <div id="chat-scroll" class="chat-scroll">
+                <div id="load-older-wrap" class="text-center mb-2" style="display: <?php echo empty($chatMessages) ? 'none' : 'block'; ?>;">
+                  <button id="btnLoadOlder" class="btn btn-sm btn-outline-secondary">Load older</button>
+                </div>
               <?php if (empty($chatMessages)): ?>
                 <div class="text-center text-muted py-5">
                   <i class="fas fa-comment-dots"></i>
@@ -355,7 +369,7 @@ if ($selectedId > 0) {
                     $createdEpoch = (int)strtotime($m['created_at'] ?? '');
                     $readAt = $m['read_at'] ?? null;
                   ?>
-                  <div class="<?php echo $rowCls; ?>">
+                    <div class="<?php echo $rowCls; ?>" id="msg-<?php echo (int)$m['message_id']; ?>" data-mid="<?php echo (int)$m['message_id']; ?>">
                     <div class="<?php echo $bubbleCls; ?>">
                       <?php if (!empty($m['body'])): ?>
                         <div style="white-space:pre-wrap; word-break:break-word;"><?php echo h($m['body']); ?></div>
@@ -399,8 +413,7 @@ if ($selectedId > 0) {
                 <input id="attachInput" type="file" name="images[]" accept="image/*" multiple style="display:none;">
                 <i class="fas fa-paperclip" style="color:#6B7280;"></i>
               </label>
-              <input id="messageBody" type="text" name="body" placeholder="Type a message..."
-                     style="flex:1; border:2px solid #E5E7EB; border-radius:0.75rem; padding:0.5rem 0.75rem;">
+              <textarea id="messageBody" name="body" placeholder="Type a message..." rows="2"></textarea>
               <button type="submit" class="btn btn-primary">
                 <i class="fas fa-paper-plane"></i> Send
               </button>
@@ -489,8 +502,153 @@ if ($selectedId > 0) {
 
       // Poll every 6s to flip Delivered -> Seen for my messages
       setInterval(refreshSeen, 6000);
+
+      // Faster initial load and lazy-load older messages
+      const chatScroll = document.getElementById('chat-scroll');
+      const loadWrap = document.getElementById('load-older-wrap');
+      const loadBtn = document.getElementById('btnLoadOlder');
+      let oldestId = (function(){
+        const firstMsg = chatScroll ? chatScroll.querySelector('[data-mid]') : null;
+        return firstMsg ? parseInt(firstMsg.getAttribute('data-mid'), 10) : 0;
+      })();
+      let loadingOlder = false;
+
+      async function loadOlder(){
+        if (loadingOlder || !oldestId) return;
+        loadingOlder = true;
+        const prevScrollHeight = chatScroll.scrollHeight;
+        try {
+          const url = 'conversation_messages.php?id='+encodeURIComponent(cid)+'&before_id='+encodeURIComponent(oldestId)+'&limit=50';
+          const r = await fetch(url, { cache: 'no-store' });
+          const j = await r.json();
+          if (!j || !j.ok || !Array.isArray(j.messages)) return;
+          if (j.messages.length === 0) {
+            if (loadWrap) loadWrap.style.display = 'none';
+            return;
+          }
+          // Render in ascending order at the top
+          const frag = document.createDocumentFragment();
+          j.messages.forEach(m => {
+            const mine = parseInt(m.sender_id,10) === myId;
+            const row = document.createElement('div');
+            row.className = mine ? 'row-me' : 'row-oth';
+            row.id = 'msg-'+m.message_id;
+            row.setAttribute('data-mid', String(m.message_id));
+            const bubble = document.createElement('div');
+            bubble.className = mine ? 'bubble bubble-me' : 'bubble';
+            if (m.body) {
+              const body = document.createElement('div');
+              body.style.whiteSpace = 'pre-wrap';
+              body.style.wordBreak = 'break-word';
+              body.textContent = m.body;
+              bubble.appendChild(body);
+            }
+            // attachments (images only)
+            try {
+              const atts = m.attachments ? JSON.parse(m.attachments) : null;
+              if (Array.isArray(atts) && atts.length) {
+                const grid = document.createElement('div');
+                grid.className = 'att-grid';
+                atts.forEach(a => {
+                  if (a && a.type === 'image' && a.url) {
+                    const aEl = document.createElement('a');
+                    aEl.href = a.url; aEl.target = '_blank'; aEl.rel = 'noopener';
+                    const img = document.createElement('img');
+                    img.src = a.url; img.alt = a.name || 'image';
+                    aEl.appendChild(img);
+                    grid.appendChild(aEl);
+                  }
+                });
+                if (grid.childNodes.length) bubble.appendChild(grid);
+              }
+            } catch(_){ }
+            const meta = document.createElement('div');
+            meta.style.marginTop = '0.25rem';
+            meta.style.fontSize = '12px';
+            meta.style.opacity = '0.8';
+            meta.style.textAlign = 'right';
+            const time = document.createElement('time');
+            time.className = 'msg-time';
+            time.setAttribute('data-epoch', String(Date.parse(m.created_at)/1000));
+            meta.appendChild(time);
+            bubble.appendChild(meta);
+
+            if (mine) {
+              const status = document.createElement('div');
+              status.className = 'msg-status';
+              status.id = 'msg-status-'+m.message_id;
+              status.setAttribute('data-mid', String(m.message_id));
+              status.setAttribute('data-seen', m.read_at ? '1' : '0');
+              const span = document.createElement('span');
+              span.textContent = m.read_at ? 'Seen' : 'Delivered';
+              span.className = m.read_at ? 'seen' : 'delivered';
+              status.appendChild(span);
+              bubble.appendChild(status);
+            }
+            row.appendChild(bubble);
+            frag.appendChild(row);
+          });
+          if (loadWrap && loadWrap.parentNode) {
+            loadWrap.parentNode.insertBefore(frag, loadWrap.nextSibling);
+          } else if (chatScroll) {
+            chatScroll.insertBefore(frag, chatScroll.firstChild);
+          }
+          // Maintain scroll position after prepending
+          const newHeight = chatScroll.scrollHeight;
+          chatScroll.scrollTop = newHeight - prevScrollHeight;
+          // Update oldestId to the smallest message_id we have
+          const first = chatScroll.querySelector('[data-mid]');
+          oldestId = first ? parseInt(first.getAttribute('data-mid'), 10) : oldestId;
+          if (typeof window.renderLocalTimes === 'function') window.renderLocalTimes();
+        } catch(e) {
+          // ignore
+        } finally {
+          loadingOlder = false;
+        }
+      }
+
+      if (loadBtn) {
+        loadBtn.addEventListener('click', loadOlder);
+      }
+
+      // Notify parent (feed.php iframe) of unread changes after markRead
+      try {
+        const notifyUnread = async () => {
+          const r = await fetch('api/unread_count.php', { cache: 'no-store' });
+          const j = await r.json();
+          if (j && j.ok && typeof j.unreadCount !== 'undefined' && window.parent) {
+            window.parent.postMessage({ type: 'inbox-unread-updated', count: j.unreadCount }, '*');
+          }
+        };
+        notifyUnread();
+        setInterval(notifyUnread, 7000);
+      } catch (_) {}
     })();
   </script>
   <?php endif; ?>
+  <script>
+    // Autosize textarea and submit on Enter (without Shift) to retain prior behavior
+    (function(){
+      const ta = document.getElementById('messageBody');
+      const form = document.getElementById('composerForm');
+      if (!ta || !form) return;
+      function autoResize(){
+        ta.style.height = 'auto';
+        const h = Math.min(ta.scrollHeight, 200);
+        ta.style.height = h + 'px';
+      }
+      ta.addEventListener('input', autoResize);
+      window.addEventListener('load', autoResize);
+      // Enter-to-send
+      ta.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          // Avoid sending empty message
+          if (ta.value.trim().length === 0) return;
+          form.requestSubmit ? form.requestSubmit() : form.submit();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

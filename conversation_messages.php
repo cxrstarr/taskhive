@@ -33,10 +33,23 @@ if (!$conv || ($conv['client_id'] != $userId && $conv['freelancer_id'] != $userI
 $db->markConversationMessagesRead($conversation_id, $userId);
 
 // Get latest messages (ascending for chat)
-$messages = $db->getConversationMessages($conversation_id, 50, 0);
+$limit = isset($_GET['limit']) ? max(1, min(200, (int)$_GET['limit'])) : 40; // slightly smaller for faster first paint
+$beforeId = isset($_GET['before_id']) ? (int)$_GET['before_id'] : 0;
+
+if ($beforeId > 0) {
+    $messages = $db->getConversationMessagesBeforeId($conversation_id, $beforeId, $limit);
+} else {
+    // latest first
+    $messages = $db->getConversationMessages($conversation_id, $limit, 0);
+}
+// Convert to ascending order for chat rendering convenience
 $messages = array_reverse($messages);
 
 echo json_encode([
     'ok'=>true,
-    'messages'=>$messages
+    'messages'=>$messages,
+    'page' => [
+        'limit' => $limit,
+        'before_id' => $beforeId
+    ]
 ]);

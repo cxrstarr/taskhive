@@ -68,8 +68,8 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
               <?= htmlspecialchars($currentUser['first_name'].' '.$currentUser['last_name']); ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><a class="dropdown-item" href="<?= $dashboard; ?>">Dashboard</a></li>
-              <li><a class="dropdown-item" href="user_profile.php?id=<?= (int)$currentUser['user_id']; ?>">Public Profile</a></li>
+              <li><a class="dropdown-item" href="dashboard.php">View Dashboard</a></li>
+              <li><a class="dropdown-item" href="settings.php">Settings</a></li>
               <li><a class="dropdown-item" href="logout.php">Logout</a></li>
             </ul>
           </li>
