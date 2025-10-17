@@ -46,6 +46,25 @@ class database {
         }
         return $pdo;
     }
+
+    // Hostinger connection (production)
+    // Usage: $this->opencon_hostinger() to connect to your Hostinger MySQL instance
+    function opencon_hostinger(): PDO {
+        static $pdoHost = null;
+        if ($pdoHost === null) {
+            $pdoHost = new PDO(
+                dsn: 'mysql:host=mysql.hostinger.com;dbname=u679323211_taskhive;charset=utf8mb4',
+                username: 'u679323211_taskhive',
+                password: '@Taskhive123',
+                options: [
+                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES   => false,
+                ]
+            );
+        }
+        return $pdoHost;
+    }
     function begin(){ $this->opencon()->beginTransaction(); }
     function commit(){ $this->opencon()->commit(); }
     function rollback(){ if ($this->opencon()->inTransaction()) $this->opencon()->rollBack(); }
