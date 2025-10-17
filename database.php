@@ -15,7 +15,7 @@
  * Debugging Aid:
  *   Set DEBUG_DB_PAY to true to log verbose payment debug info.
  */
-const DEBUG_DB_PAY = true; // <--- Turn ON (true) only while diagnosing HY093, then OFF.
+const DEBUG_DB_PAY = false; // Set true only for local debugging; keep false on production
 
 // Set a consistent application timezone to avoid PHP/MySQL drift in timestamps
 // Adjust this to your preferred region if needed
@@ -33,18 +33,48 @@ class database {
     function opencon(): PDO {
         static $pdo = null;
         if ($pdo === null) {
-            $pdo = new PDO(
-                dsn: 'mysql:host=localhost;dbname=taskhive;charset=utf8mb4',
-                username: 'root',
-                password: '',
-                options: [
-                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES   => false,
-                ]
-            );
+            try {
+                if ($this->shouldUseHostinger()) {
+                    // Production (Hostinger)
+                    $pdo = new PDO(
+                        'mysql:host=mysql.hostinger.com;dbname=u679323211_taskhive;charset=utf8mb4',
+                        'u679323211_taskhive',
+                        '@Taskhive123',
+                        [
+                            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                            PDO::ATTR_EMULATE_PREPARES   => false,
+                        ]
+                    );
+                } else {
+                    // Local development
+                    $pdo = new PDO(
+                        'mysql:host=localhost;dbname=taskhive;charset=utf8mb4',
+                        'root',
+                        '',
+                        [
+                            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                            PDO::ATTR_EMULATE_PREPARES   => false,
+                        ]
+                    );
+                }
+            } catch (Throwable $e) {
+                error_log('[DB] Connection failed: ' . $e->getMessage());
+                throw $e;
+            }
         }
         return $pdo;
+    }
+
+    private function shouldUseHostinger(): bool {
+        // Use explicit env var if provided
+        $env = getenv('TASKHIVE_ENV') ?: '';
+        if (strtolower($env) === 'prod') return true;
+        if (strtolower($env) === 'dev') return false;
+        // Auto-detect by host name
+        $host = $_SERVER['HTTP_HOST'] ?? '';
+        return stripos($host, 'thetaskhive.site') !== false || stripos($host, 'hostinger') !== false;
     }
 
     // Hostinger connection (production)
@@ -53,10 +83,10 @@ class database {
         static $pdoHost = null;
         if ($pdoHost === null) {
             $pdoHost = new PDO(
-                dsn: 'mysql:host=mysql.hostinger.com;dbname=u679323211_taskhive;charset=utf8mb4',
-                username: 'u679323211_taskhive',
-                password: '@Taskhive123',
-                options: [
+                'mysql:host=mysql.hostinger.com;dbname=u679323211_taskhive;charset=utf8mb4',
+                'u679323211_taskhive',
+                '@Taskhive123',
+                [
                     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES   => false,
@@ -73,6 +103,17 @@ class database {
         if (!DEBUG_DB_PAY) return;
         $msg = '['.$tag.'] '.(is_string($data)?$data:json_encode($data,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
         error_log($msg);
+    }
+
+    // Optional: quick connectivity test
+    function pingDb(): bool {
+        try {
+            $this->opencon()->query('SELECT 1');
+            return true;
+        } catch (Throwable $e) {
+            error_log('[DB][PING] '.$e->getMessage());
+            return false;
+        }
     }
 
     /* ---------------- USER / AUTH ---------------- */
