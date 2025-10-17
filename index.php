@@ -329,7 +329,7 @@ if (!empty($_SESSION['user_id'])) {
                     </div>
 
                     <h1 class="text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-                        Where Worked
+                        Where Work
                         <span class="relative inline-block">
                             <span class="relative z-10 text-amber-600">Buzzes</span>
                             <span class="absolute inset-0 bg-amber-200 -skew-x-12"></span>
