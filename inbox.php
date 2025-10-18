@@ -376,6 +376,22 @@ try {
         /* Collapsible client payment bar: keep header visible, hide form when collapsed */
         #client-pay-bar.collapsed #client-payment-form { display: none; }
         #client-pay-bar.collapsed { padding-bottom: 0.75rem; }
+
+        /* Attachment preview styles */
+        #attach-preview { margin-top: 0.5rem; }
+        .attach-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+        @media (min-width: 640px) { .attach-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        .attach-item { position: relative; border-radius: 0.5rem; overflow: hidden; }
+        .attach-item img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+        .attach-remove { position: absolute; top: 0.25rem; right: 0.25rem; background: rgba(255,255,255,0.9); border-radius: 9999px; padding: 0.25rem; line-height: 0; }
+        .attach-remove:hover { background: rgba(254, 226, 226, 0.95); }
+
+        /* Drag-and-drop highlight on reply compose */
+        #reply-compose.dropzone-active {
+            outline: 2px dashed #f59e0b;
+            outline-offset: 6px;
+            background-color: rgba(251, 191, 36, 0.06);
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 via-amber-50/30 to-orange-50/30">
@@ -810,16 +826,24 @@ try {
                         <div class="flex items-start gap-4">
                             <img src="<?php echo htmlspecialchars($currentUser['avatar']); ?>" alt="You" class="w-10 h-10 rounded-full border-2 border-amber-400 object-cover">
 
-                            <div class="flex-1">
+                            <div class="flex-1" id="reply-compose">
                                 <textarea id="reply-textarea" placeholder="Type your reply..." class="w-full min-h-24 px-4 py-3 border border-amber-200 rounded-lg text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 resize-none mb-3" oninput="checkReplyText()"></textarea>
-                                
-                                <div class="flex items-center justify-between">
+
+                                <div class="flex items-center justify-between flex-wrap">
                                     <label class="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer">
                                         <i data-lucide="paperclip" class="w-4 h-4"></i>
                                         <span class="text-sm font-medium">Attach</span>
                                         <input id="image-input" type="file" accept="image/*" multiple class="hidden">
                                     </label>
                                     <span id="attach-indicator" class="ml-2 text-xs text-gray-600 hidden"></span>
+                                    <div class="w-full"></div>
+                                    <div id="attach-preview" class="hidden w-full">
+                                        <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+                                            <span id="attach-count"></span>
+                                            <button type="button" id="attach-clear-all" class="px-2 py-1 rounded border border-amber-200 text-amber-700 hover:bg-amber-50">Remove all</button>
+                                        </div>
+                                        <div class="attach-grid"></div>
+                                    </div>
 
                                     <div class="flex items-center gap-2">
                                         <button class="flex items-center gap-2 px-4 py-2 border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 hover:border-amber-400 transition-colors">
@@ -907,6 +931,11 @@ try {
     const messageListEl = document.getElementById('message-list');
     const imageInputEl = document.getElementById('image-input');
     const attachIndicatorEl = document.getElementById('attach-indicator');
+    const attachPreviewEl = document.getElementById('attach-preview');
+    const attachCountEl = document.getElementById('attach-count');
+    const attachClearAllBtn = document.getElementById('attach-clear-all');
+    const replyComposeEl = document.getElementById('reply-compose');
+    let selectedImages = []; // [{file: File, url: string}]
     const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB, match backend
 
         function toggleSidebar() {
@@ -1520,7 +1549,8 @@ try {
 
                 // Reset inputs
                 textarea.value = '';
-                if (fileInput) fileInput.value = '';
+                // Clear selected preview images and file input
+                clearAllSelected();
                 checkReplyText();
                 // Hide attach indicator
                 if (attachIndicatorEl) {
@@ -1686,6 +1716,19 @@ try {
                 });
                 document._lbEscBound = true;
             }
+
+            // Also enable lightbox for pre-send attachment previews
+            if (attachPreviewEl && !attachPreviewEl._lbBound) {
+                attachPreviewEl.addEventListener('click', (e) => {
+                    const img = e.target.closest('img[data-preview-src]');
+                    if (!img) return;
+                    const src = img.getAttribute('data-preview-src') || img.src;
+                    imgEl.src = src;
+                    lightbox.classList.remove('hidden');
+                    lightbox.classList.add('flex');
+                });
+                attachPreviewEl._lbBound = true;
+            }
         }
 
         // Initialize icons and initial times, and load first conversation to sync times
@@ -1698,17 +1741,10 @@ try {
             // Update send button state when an image is picked/cleared
             if (imageInputEl) {
                 imageInputEl.addEventListener('change', () => {
-                    if (imageInputEl.files && imageInputEl.files.length) {
-                        const count = imageInputEl.files.length;
-                        const name = count === 1 ? imageInputEl.files[0].name : `${count} images selected`;
-                        if (attachIndicatorEl) {
-                            attachIndicatorEl.textContent = `Attached: ${name}`;
-                            attachIndicatorEl.classList.remove('hidden');
-                        }
-                    } else if (attachIndicatorEl) {
-                        attachIndicatorEl.classList.add('hidden');
-                        attachIndicatorEl.textContent = '';
-                    }
+                    const files = (imageInputEl.files && imageInputEl.files.length) ? Array.from(imageInputEl.files) : [];
+                    addFilesToSelection(files);
+                    // Clear the input so same file selection can trigger change again
+                    imageInputEl.value = '';
                     checkReplyText();
                 });
             }
@@ -1743,6 +1779,33 @@ try {
                 rf.addEventListener('submit', submitReviewViaAjax);
                 rf._bound = true;
             }
+
+            // Clear all attachments button
+            if (attachClearAllBtn && !attachClearAllBtn._bound) {
+                attachClearAllBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    clearAllSelected();
+                });
+                attachClearAllBtn._bound = true;
+            }
+
+            // Drag-and-drop support on reply area
+            if (replyComposeEl && !replyComposeEl._dndBound) {
+                const onDragOver = (e) => { e.preventDefault(); replyComposeEl.classList.add('dropzone-active'); };
+                const onDragEnter = (e) => { e.preventDefault(); replyComposeEl.classList.add('dropzone-active'); };
+                const onDragLeave = (e) => { if (e.target === replyComposeEl) replyComposeEl.classList.remove('dropzone-active'); };
+                const onDrop = (e) => {
+                    e.preventDefault();
+                    replyComposeEl.classList.remove('dropzone-active');
+                    const files = e.dataTransfer && e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+                    if (files.length) addFilesToSelection(files);
+                };
+                replyComposeEl.addEventListener('dragover', onDragOver);
+                replyComposeEl.addEventListener('dragenter', onDragEnter);
+                replyComposeEl.addEventListener('dragleave', onDragLeave);
+                replyComposeEl.addEventListener('drop', onDrop);
+                replyComposeEl._dndBound = true;
+            }
         });
 
         function openReviewModal(bookingId) {
@@ -1759,6 +1822,109 @@ try {
             setReviewRating(0);
             rm.classList.remove('hidden');
             rm.classList.add('flex');
+        }
+
+        // Attachment preview helpers
+        function addFilesToSelection(files) {
+            if (!files || !files.length) return;
+            const dt = new DataTransfer();
+            // Start with currently selected images
+            selectedImages.forEach(it => dt.items.add(it.file));
+
+            files.forEach(file => {
+                // Only images and within size limit
+                if (!file.type.startsWith('image/')) return;
+                if (file.size > MAX_IMAGE_SIZE) {
+                    alert(`Image "${file.name}" is too large. Max size is 10MB.`);
+                    return;
+                }
+                // Deduplicate by name+size+lastModified
+                const exists = selectedImages.some(it => it.file.name === file.name && it.file.size === file.size && it.file.lastModified === file.lastModified);
+                if (exists) return;
+                dt.items.add(file);
+            });
+
+            // Rebuild selection with fresh object URLs
+            // Revoke previous URLs to avoid leaks
+            selectedImages.forEach(it => URL.revokeObjectURL(it.url));
+            selectedImages = Array.from(dt.files).map(f => ({ file: f, url: URL.createObjectURL(f) }));
+            // Reflect into hidden input
+            imageInputEl.files = dt.files;
+            renderAttachPreview();
+        }
+
+        function removeSelectedAt(index) {
+            index = Number(index);
+            if (isNaN(index) || index < 0 || index >= selectedImages.length) return;
+            // Build a new FileList without the removed index
+            const dt = new DataTransfer();
+            selectedImages.forEach((it, i) => { if (i !== index) dt.items.add(it.file); });
+            // Revoke removed url
+            try { URL.revokeObjectURL(selectedImages[index].url); } catch(_) {}
+            // Recompute selectedImages with new URLs
+            selectedImages.forEach((it, i) => { if (i !== index) try { URL.revokeObjectURL(it.url); } catch(_) {} });
+            selectedImages = Array.from(dt.files).map(f => ({ file: f, url: URL.createObjectURL(f) }));
+            imageInputEl.files = dt.files;
+            renderAttachPreview();
+            checkReplyText();
+        }
+
+        function clearAllSelected() {
+            selectedImages.forEach(it => { try { URL.revokeObjectURL(it.url); } catch(_) {} });
+            selectedImages = [];
+            const dt = new DataTransfer();
+            imageInputEl.files = dt.files;
+            renderAttachPreview();
+            if (attachIndicatorEl) { attachIndicatorEl.classList.add('hidden'); attachIndicatorEl.textContent = ''; }
+            checkReplyText();
+        }
+
+        function renderAttachPreview() {
+            const count = selectedImages.length;
+            if (attachIndicatorEl) {
+                if (count > 0) {
+                    attachIndicatorEl.textContent = count === 1 ? `Attached: ${selectedImages[0].file.name}` : `Attached: ${count} images`;
+                    attachIndicatorEl.classList.remove('hidden');
+                } else {
+                    attachIndicatorEl.classList.add('hidden');
+                    attachIndicatorEl.textContent = '';
+                }
+            }
+            if (!attachPreviewEl) return;
+            const grid = attachPreviewEl.querySelector('.attach-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            if (count === 0) {
+                attachPreviewEl.classList.add('hidden');
+                if (attachCountEl) attachCountEl.textContent = '';
+                return;
+            }
+            attachPreviewEl.classList.remove('hidden');
+            if (attachCountEl) attachCountEl.textContent = count === 1 ? '1 image attached' : `${count} images attached`;
+            selectedImages.forEach((it, idx) => {
+                const item = document.createElement('div');
+                item.className = 'attach-item';
+                item.innerHTML = `
+                    <img src="${it.url}" data-preview-src="${it.url}" alt="attachment preview">
+                    <button type="button" class="attach-remove" aria-label="Remove image" data-index="${idx}">
+                        <i data-lucide="x" class="w-4 h-4 text-red-600"></i>
+                    </button>
+                `;
+                grid.appendChild(item);
+            });
+            // Bind remove handlers
+            grid.querySelectorAll('.attach-remove').forEach(btn => {
+                if (!btn._bound) {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const i = btn.getAttribute('data-index');
+                        removeSelectedAt(i);
+                    });
+                    btn._bound = true;
+                }
+            });
+            // Refresh icons
+            lucide.createIcons();
         }
 
         function closeReviewModal() {
