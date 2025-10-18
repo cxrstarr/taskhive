@@ -372,6 +372,10 @@ try {
             opacity: 0.5;
             cursor: not-allowed;
         }
+
+        /* Collapsible client payment bar: keep header visible, hide form when collapsed */
+        #client-pay-bar.collapsed #client-payment-form { display: none; }
+        #client-pay-bar.collapsed { padding-bottom: 0.75rem; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-50 via-amber-50/30 to-orange-50/30">
@@ -720,6 +724,14 @@ try {
                                     <div class="text-amber-900 font-medium" id="cpb-title">Pay your freelancer</div>
                                     <div class="text-sm text-amber-800" id="cpb-subtitle"></div>
                                 </div>
+                            </div>
+                            <div class="flex items-center">
+                                <button type="button" id="cpb-toggle" class="p-2 rounded hover:bg-amber-100 text-amber-700"
+                                        aria-controls="client-payment-form" aria-expanded="true" title="Hide payment panel">
+                                    <span class="sr-only">Toggle payment panel</span>
+                                    <i id="cpb-icon-up" data-lucide="chevron-up" class="w-5 h-5"></i>
+                                    <i id="cpb-icon-down" data-lucide="chevron-down" class="w-5 h-5 hidden"></i>
+                                </button>
                             </div>
                         </div>
                         <form id="client-payment-form" action="payment_actions.php" method="POST" class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1159,6 +1171,9 @@ try {
                 const hintEl = document.getElementById('cpf-hint');
                 const selEl = document.getElementById('cpf-method');
                 const phaseEl = document.getElementById('cpf-phase');
+                const toggleBtn = document.getElementById('cpb-toggle');
+                const iconUp = document.getElementById('cpb-icon-up');
+                const iconDown = document.getElementById('cpb-icon-down');
 
                 // Compute remaining balance and only show bar if there's something left to pay
                 const total = bk ? Number(bk.total_amount || 0) : 0;
@@ -1224,6 +1239,36 @@ try {
                     }
 
                     cpb.classList.remove('hidden');
+
+                    // Restore collapsed state per conversation/booking
+                    if (toggleBtn && bk && bk.booking_id) {
+                        toggleBtn.dataset.convId = String(id);
+                        toggleBtn.dataset.bookingId = String(bk.booking_id);
+                        const key = `taskhive:cpb:collapsed:${id}:${bk.booking_id}`;
+                        const collapsed = localStorage.getItem(key) === '1';
+                        cpb.classList.toggle('collapsed', collapsed);
+                        toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                        if (iconUp && iconDown) {
+                            iconUp.classList.toggle('hidden', collapsed);
+                            iconDown.classList.toggle('hidden', !collapsed);
+                        }
+                        if (!toggleBtn._bound) {
+                            toggleBtn.addEventListener('click', () => {
+                                const cId = toggleBtn.dataset.convId || String(id);
+                                const bId = toggleBtn.dataset.bookingId || (bk && bk.booking_id ? String(bk.booking_id) : '0');
+                                const storageKey = `taskhive:cpb:collapsed:${cId}:${bId}`;
+                                const nowCollapsed = !cpb.classList.contains('collapsed');
+                                cpb.classList.toggle('collapsed', nowCollapsed);
+                                localStorage.setItem(storageKey, nowCollapsed ? '1' : '0');
+                                toggleBtn.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
+                                if (iconUp && iconDown) {
+                                    iconUp.classList.toggle('hidden', nowCollapsed);
+                                    iconDown.classList.toggle('hidden', !nowCollapsed);
+                                }
+                            });
+                            toggleBtn._bound = true;
+                        }
+                    }
                 } else {
                     cpb.classList.add('hidden');
                 }
