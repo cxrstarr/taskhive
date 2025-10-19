@@ -379,6 +379,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="icon" type="image/png" href="img/bee.jpg">
   <meta charset="UTF-8">
   <title>TaskHive Admin</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">

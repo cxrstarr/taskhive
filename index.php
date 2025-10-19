@@ -10,7 +10,7 @@ if (!empty($_SESSION['user_id'])) {
     $u = $db->getUser((int)$_SESSION['user_id']);
     if ($u) {
         $currentUser = [
-            'id'     => (int)$u['user_id'],
+            'id'     => (int)$u['user_id'],                                                                                                                                                                  
             'name'   => trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: ($u['email'] ?? 'User'),
             'email'  => $u['email'] ?? '',
             'avatar' => $u['profile_picture'] ?: 'img/profile_icon.webp',
@@ -65,7 +65,7 @@ if (!empty($_SESSION['user_id'])) {
     <link rel="icon" type="image/png" href="img/bee.jpg">
     
     <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com"></script>                                                                                                                                                                                                                                                                                                   
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -280,9 +280,8 @@ if (!empty($_SESSION['user_id'])) {
         <div id="mobile-menu" class="mobile-menu md:hidden bg-white border-t border-amber-200">
             <div class="px-4 py-6 space-y-4">
                 <a href="feed.php" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">Find Gigs</a>
-                <a href="post_service.php" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">Post a Task</a>
+                <a href="dashboard.php" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">Post a Task</a>
                 <a href="#how-it-works" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">How It Works</a>
-                <a href="payment_terms.php" class="block py-2 text-gray-700 hover:text-amber-600 transition-colors">Pricing</a>
                 <div class="pt-4 space-y-3 border-t border-amber-200">
                     <?php if ($currentUser): ?>
                         <div class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">

@@ -38,6 +38,7 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="icon" type="image/png" href="img/bee.jpg">
   <meta charset="UTF-8">
   <title><?= htmlspecialchars($svc['title']); ?> - TaskHive</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">

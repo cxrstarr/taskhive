@@ -213,6 +213,7 @@ try {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" type="image/png" href="img/bee.jpg">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Task Hive - Inbox</title>
@@ -385,6 +386,8 @@ try {
         .attach-item img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
         .attach-remove { position: absolute; top: 0.25rem; right: 0.25rem; background: rgba(255,255,255,0.9); border-radius: 9999px; padding: 0.25rem; line-height: 0; }
         .attach-remove:hover { background: rgba(254, 226, 226, 0.95); }
+    /* Limit preview height and enable wheel scroll */
+    #attach-preview .attach-grid { max-height: 220px; overflow-y: auto; padding-right: 4px; }
 
         /* Drag-and-drop highlight on reply compose */
         #reply-compose.dropzone-active {
@@ -1499,15 +1502,14 @@ try {
             const textarea = document.getElementById('reply-textarea');
             const button = document.getElementById('send-button');
             const hasText = textarea.value.trim().length > 0;
-            const hasImages = imageInputEl && imageInputEl.files && imageInputEl.files.length > 0;
+            const hasImages = Array.isArray(selectedImages) ? selectedImages.length > 0 : false;
             button.disabled = !(hasText || hasImages);
         }
 
         async function sendReply() {
             const textarea = document.getElementById('reply-textarea');
             const text = textarea.value.trim();
-            const fileInput = document.getElementById('image-input');
-            const files = (fileInput && fileInput.files) ? Array.from(fileInput.files) : [];
+            const files = Array.isArray(selectedImages) ? selectedImages.map(it => it.file) : [];
             
             if (!text && files.length === 0) return;
             

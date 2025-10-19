@@ -11,6 +11,7 @@ $revenues = $db->opencon()->query("SELECT DATE_FORMAT(paid_at,'%Y-%m') as month,
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="icon" type="image/png" href="img/bee.jpg">
   <meta charset="UTF-8">
   <title>Analytics - Admin</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">

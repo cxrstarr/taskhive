@@ -10,6 +10,7 @@ $flaggedReviews = $db->opencon()->query("SELECT * FROM reviews WHERE flagged=1 O
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="icon" type="image/png" href="img/bee.jpg">
   <meta charset="UTF-8">
   <title>Flagged Reviews - Admin</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">

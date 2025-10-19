@@ -138,6 +138,7 @@ if ($selectedId > 0) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/png" href="img/bee.jpg">
   <meta charset="UTF-8">
   <title>Conversation - TaskHive</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
