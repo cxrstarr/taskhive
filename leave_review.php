@@ -2,7 +2,36 @@
 session_start();
 require_once __DIR__ . '/database.php';
 
+// Helper: compute a safe redirect target within this site
+function taskhive_safe_redirect_target(?string $target): string {
+  $target = trim((string)$target);
+  if ($target === '') return '';
+  // If absolute URL, allow only same-host then reduce to path+query
+  if (preg_match('/^https?:\/\//i', $target)) {
+    $parts = @parse_url($target);
+    if (!$parts || empty($parts['host'])) return '';
+    $currHost = $_SERVER['HTTP_HOST'] ?? '';
+    if (strcasecmp((string)$parts['host'], (string)$currHost) !== 0) return '';
+    $path = $parts['path'] ?? '/';
+    $query = isset($parts['query']) ? ('?' . $parts['query']) : '';
+    $target = $path . $query;
+  }
+  // Disallow protocol-relative URLs
+  if (preg_match('/^\/{2}/', $target)) return '';
+  // Avoid redirecting back to this page
+  if (stripos($target, 'leave_review.php') !== false) return '';
+  return $target;
+}
+
 $db = new database();
+// Compute default redirect for this request (GET param or HTTP referrer)
+$redirectCandidate = isset($_GET['redirect']) ? (string)$_GET['redirect'] : '';
+if ($redirectCandidate === '' && !empty($_SERVER['HTTP_REFERER'])) {
+  $redirectCandidate = (string)$_SERVER['HTTP_REFERER'];
+}
+$redirectDefault = taskhive_safe_redirect_target($redirectCandidate);
+// Modal mode flag (when embedding this page in an iframe or popup)
+$isModal = isset($_GET['modal']) || isset($_POST['modal']);
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
@@ -27,7 +56,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $db->systemBookingMessage($booking_id, $uid, 'Client left a review. Thank you!');
             } catch (Throwable $e) {}
-            header('Location: client_profile.php?review=thanks');
+      if ($isModal) {
+        // In modal/iframe/popup: notify opener/parent and optionally close
+        ?><!DOCTYPE html>
+        <html><head><meta charset="utf-8"><title>Review Submitted</title></head>
+        <body style="font-family:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding:20px;">
+        <script>
+          try {
+            if (window.opener) { window.opener.postMessage({ type: 'review_submitted', ok: true }, '*'); }
+            if (window.parent && window.parent !== window) { window.parent.postMessage({ type: 'review_submitted', ok: true }, '*'); }
+          } catch (e) {}
+          try { window.close(); } catch (e) {}
+        </script>
+        <p>Thank you for your review. You can close this window.</p>
+        </body></html><?php
+      } else {
+        // Decide where to go back: prefer explicit redirect (POST/GET), then referrer, else fallback
+        $redirParam = $_POST['redirect'] ?? $_GET['redirect'] ?? '';
+        if ($redirParam === '' && !empty($_SERVER['HTTP_REFERER'])) {
+          $redirParam = (string)$_SERVER['HTTP_REFERER'];
+        }
+        $go = taskhive_safe_redirect_target($redirParam);
+        if ($go === '') { $go = 'client_profile.php?review=thanks'; }
+        header('Location: ' . $go);
+      }
             exit;
         } else {
             $error = 'Unable to submit review. You can only review completed or delivered bookings once.';
@@ -52,6 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="mb-4 p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
     <form method="post" id="review-form">
+      <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($redirectDefault, ENT_QUOTES); ?>">
+      <?php if ($isModal): ?><input type="hidden" name="modal" value="1"><?php endif; ?>
       <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
       <div id="review-stars" class="flex items-center gap-2 mb-4" role="radiogroup" aria-label="Rating">
         <!-- Built with JS below; 5 clickable stars -->
@@ -62,7 +116,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <textarea name="comment" rows="5" class="w-full border border-amber-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-amber-500/30" placeholder="Share your experience..."></textarea>
 
       <div class="mt-6 flex items-center justify-end gap-3">
-        <a href="client_profile.php" class="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-100">Cancel</a>
+        <?php if ($isModal): ?>
+          <a href="#" onclick="try{ if (window.opener) window.opener.postMessage({type:'review_cancel'},'*'); if (window.parent && window.parent!==window) window.parent.postMessage({type:'review_cancel'},'*'); window.close(); }catch(e){} return false;" class="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-100">Cancel</a>
+        <?php else: ?>
+          <a href="<?php echo htmlspecialchars($redirectDefault !== '' ? $redirectDefault : 'client_profile.php', ENT_QUOTES); ?>" class="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-100">Cancel</a>
+        <?php endif; ?>
         <button type="submit" class="px-4 py-2 rounded bg-amber-600 text-white hover:bg-amber-700">Submit Review</button>
       </div>
     </form>
