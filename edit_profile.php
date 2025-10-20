@@ -157,7 +157,7 @@ $currentUser = [
     <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-amber-200/50 shadow-sm">
         <div class="px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
-                <a href="client_profile.php" class="flex items-center gap-3 cursor-pointer hover:scale-105 transition-transform">
+                <a href="index.php" class="flex items-center gap-3 cursor-pointer hover:scale-105 transition-transform">
                     <div class="relative">
                         <svg class="w-8 h-8 fill-amber-400 stroke-amber-600 stroke-2" viewBox="0 0 24 24">
                             <polygon points="12 2, 22 8.5, 22 15.5, 12 22, 2 15.5, 2 8.5" />

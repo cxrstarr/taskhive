@@ -389,7 +389,7 @@ $categories = array_merge(['All'], $categoryList);
                         <i data-lucide="menu" class="w-5 h-5 text-gray-700"></i>
                     </button>
 
-                    <a href="feed.php" class="flex items-center gap-3 cursor-pointer hover:scale-105 transition-transform">
+                    <a href="index.php" class="flex items-center gap-3 cursor-pointer hover:scale-105 transition-transform">
                         <div class="relative">
                             <svg class="w-8 h-8 fill-amber-400 stroke-amber-600 stroke-2" viewBox="0 0 24 24">
                                 <polygon points="12 2, 22 8.5, 22 15.5, 12 22, 2 15.5, 2 8.5"/>
