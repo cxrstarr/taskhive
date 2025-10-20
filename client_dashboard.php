@@ -552,76 +552,25 @@ $reviews_written = array_map(function($r){
         </div>
     </div>
 
-    <!-- Review Modal -->
-    <div id="reviewModal" class="modal">
-        <div class="modal-content modal-review">
-            <div class="modal-header-review">
-                <div class="modal-header-icon">
-                    <i class="fas fa-star"></i>
-                </div>
+    <!-- Review Modal (iframe mode using leave_review.php) -->
+    <div id="reviewIframeModal" class="modal" aria-hidden="true">
+        <div class="modal-content" style="max-width:800px; width:100%;">
+            <div class="modal-header-review" style="padding: 14px 20px; border-bottom: 1px solid #f0f0f0; display:flex; align-items:center; gap:12px;">
+                <div class="modal-header-icon"><i class="fas fa-star"></i></div>
                 <div>
-                    <h3>Write a Review</h3>
+                    <h3 style="margin:0;">Write a Review</h3>
                     <p class="modal-subtitle">Share your experience with this service</p>
                 </div>
-                <button class="modal-close" onclick="closeReviewModal()">
+                <button class="modal-close" onclick="closeReviewIframeModal()" title="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-
-            <!-- Service Info Display -->
-            <div class="review-modal-info">
-                <div class="review-modal-service">
-                    <span class="info-label">Service:</span>
-                    <span id="modalServiceName" class="info-value">-</span>
-                </div>
-                <div class="review-modal-freelancer">
-                    <img id="modalFreelancerAvatar" src="" alt="" class="modal-avatar" onerror="this.onerror=null;this.src='img/profile_icon.webp';">
-                    <div>
-                        <span class="info-label">Freelancer</span>
-                        <span id="modalFreelancerName" class="info-value-block">-</span>
-                    </div>
-                </div>
-            </div>
-            
-            <form id="reviewForm" method="POST" action="leave_review_client.php" onsubmit="return validateReview(event)">
-                <input type="hidden" id="bookingId" name="booking_id">
-                
-                <div class="form-group-modal">
-                    <label>How would you rate this service?</label>
-                    <div class="star-rating-container">
-                        <div class="star-rating">
-                            <i class="fas fa-star" data-rating="1"></i>
-                            <i class="fas fa-star" data-rating="2"></i>
-                            <i class="fas fa-star" data-rating="3"></i>
-                            <i class="fas fa-star" data-rating="4"></i>
-                            <i class="fas fa-star" data-rating="5"></i>
-                        </div>
-                        <span id="ratingText" class="rating-description">Select a rating</span>
-                    </div>
-                    <input type="hidden" id="rating" name="rating" value="0">
-                </div>
-
-                <div class="form-group-modal">
-                    <label for="comment">Your Review <span class="optional-text">(Optional)</span></label>
-                    <textarea id="comment" name="comment" rows="5" placeholder="Tell us about your experience. What did you like? What could be improved?" class="review-textarea"></textarea>
-                    <span class="char-count"><span id="charCount">0</span>/500 characters</span>
-                </div>
-
-                <div class="modal-footer-review">
-                    <button type="button" class="btn-cancel" onclick="closeReviewModal()">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn-submit-review">
-                        <i class="fas fa-paper-plane"></i>
-                        Submit Review
-                    </button>
-                </div>
-            </form>
+            <iframe id="reviewIframe" src="about:blank" style="display:block; width:100%; height:560px; border:0;" title="Leave a review"></iframe>
         </div>
     </div>
 
     <script>
-    // Expose a map for quick lookup when opening review modal
+    // Expose a map for quick lookup (kept for potential future use)
     window.BOOKINGS_BY_ID = <?php echo json_encode(array_reduce($bookings, function($acc,$b){
         $acc[$b['id']] = [
             'service_name' => $b['service_name'],
@@ -631,60 +580,35 @@ $reviews_written = array_map(function($r){
         return $acc;
     }, []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
 
+    // Open the review modal as an iframe to leave_review.php (modal mode)
     function openReviewModalFromButton(btn){
         const bid   = btn.getAttribute('data-booking-id') || '';
-        const sname = btn.getAttribute('data-service-name') || '-';
-        const fname = btn.getAttribute('data-freelancer-name') || '-';
-    let fava  = btn.getAttribute('data-avatar') || '';
-    if (!fava) { fava = 'img/profile_icon.webp'; }
-        document.getElementById('bookingId').value = bid;
-        document.getElementById('modalServiceName').textContent = sname;
-        document.getElementById('modalFreelancerName').textContent = fname;
-        const img = document.getElementById('modalFreelancerAvatar');
-        img.src = fava; img.alt = fname;
-        // Reset rating + comment on open
-        const ratingInput = document.getElementById('rating');
-        ratingInput.value = '0';
-        document.querySelectorAll('.star-rating .fa-star').forEach(s=>s.classList.remove('star-filled'));
-        const rt = document.getElementById('ratingText'); if (rt) rt.textContent = 'Select a rating';
-        const ta = document.getElementById('comment'); if (ta) ta.value = '';
-        const cc = document.getElementById('charCount'); if (cc) cc.textContent = '0';
-        document.getElementById('reviewModal').classList.add('open');
+        const redirect = window.location.href;
+        const url = 'leave_review.php?booking_id=' + encodeURIComponent(bid) + '&modal=1&redirect=' + encodeURIComponent(redirect);
+        const iframe = document.getElementById('reviewIframe');
+        if (iframe) iframe.src = url;
+        const modal = document.getElementById('reviewIframeModal');
+        if (modal) modal.classList.add('open');
     }
-    function closeReviewModal(){
-        document.getElementById('reviewModal').classList.remove('open');
+    function closeReviewIframeModal(){
+        const modal = document.getElementById('reviewIframeModal');
+        if (modal) modal.classList.remove('open');
+        const iframe = document.getElementById('reviewIframe');
+        if (iframe) iframe.src = 'about:blank';
     }
-    // Star rating interactions
-    (function(){
-        const stars = document.querySelectorAll('.star-rating .fas.fa-star');
-        const ratingInput = document.getElementById('rating');
-        const ratingText  = document.getElementById('ratingText');
-        const desc = ['Very bad','Bad','Okay','Good','Excellent'];
-        stars.forEach(star => {
-            star.addEventListener('click', () => {
-                const rating = parseInt(star.getAttribute('data-rating')) || 0;
-                ratingInput.value = rating;
-                stars.forEach(s => s.classList.toggle('star-filled', (parseInt(s.getAttribute('data-rating'))||0) <= rating));
-                if (ratingText) ratingText.textContent = rating ? desc[rating-1] + ' ('+rating+'/5)' : 'Select a rating';
-            });
-        });
-        // Char count for comment
-        const ta = document.getElementById('comment');
-        const cc = document.getElementById('charCount');
-        if (ta && cc){
-            ta.addEventListener('input', ()=>{ cc.textContent = Math.min(500, ta.value.length); });
-            ta.maxLength = 500;
+    // Listen for messages from the iframe (review submitted/cancel)
+    window.addEventListener('message', function(ev){
+        const d = ev && ev.data ? ev.data : null;
+        if (!d || typeof d !== 'object') return;
+        if (d.type === 'review_submitted') {
+            // Close modal and refresh to reflect state change
+            closeReviewIframeModal();
+            // Refresh the page to update bookings and stats
+            window.location.reload();
+        } else if (d.type === 'review_cancel') {
+            closeReviewIframeModal();
         }
-    })();
-    function validateReview(e){
-        const rating = parseInt(document.getElementById('rating').value)||0;
-        if (rating < 1){
-            alert('Please select a star rating.');
-            e.preventDefault();
-            return false;
-        }
-        return true;
-    }
+    });
     function toggleEditProfile(edit){
         const form = document.getElementById('profileCard');
         if (!form) return;

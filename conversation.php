@@ -455,6 +455,22 @@ if ($selectedId > 0) {
       });
     })();
   </script>
+  <!-- Global Review Iframe Modal for conversation page -->
+  <div id="review-iframe-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1050; align-items:center; justify-content:center;">
+    <div style="width:100%; max-width:820px; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+      <div style="display:flex; align-items:center; gap:12px; border-bottom:1px solid #f0f0f0; padding:12px 16px;">
+        <div style="width:40px; height:40px; background:#fff7d6; color:#f59e0b; display:grid; place-items:center; border-radius:50%;">
+          <i class="fa-solid fa-star"></i>
+        </div>
+        <div style="flex:1;">
+          <div style="font-weight:600;">Write a Review</div>
+          <div style="color:#666; font-size:.9rem;">Share your experience for this booking</div>
+        </div>
+        <button type="button" id="review-iframe-close" class="btn btn-sm btn-light"><i class="fas fa-times"></i></button>
+      </div>
+      <iframe id="review-iframe" src="about:blank" style="display:block; width:100%; height:560px; border:0;" title="Leave a review"></iframe>
+    </div>
+  </div>
   <script src="public/js/chat_attach_preview.js"></script>
   <script src="public/js/chat_time.js"></script>
   <?php if ($selectedId > 0): ?>
@@ -500,6 +516,54 @@ if ($selectedId > 0) {
           if (window.renderLocalTimes) window.renderLocalTimes();
         } catch(e){}
       }
+        // Intercept clicks on Leave a review links inside messages, open modal iframe
+        document.addEventListener('click', function(e){
+          const a = e.target.closest && e.target.closest('a.leave-review-link');
+          if (!a) return;
+          const href = a.getAttribute('href') || '';
+          if (!href) return;
+          e.preventDefault();
+          const url = new URL(href, window.location.origin);
+          url.searchParams.set('modal','1');
+          url.searchParams.set('redirect', window.location.href);
+          const iframe = document.getElementById('review-iframe');
+          const modal  = document.getElementById('review-iframe-modal');
+          if (iframe && modal) {
+            iframe.src = url.toString();
+            modal.style.display = 'flex';
+          }
+        }, { passive: false });
+
+        // Close button for iframe modal
+        (function(){
+          const btn = document.getElementById('review-iframe-close');
+          const modal = document.getElementById('review-iframe-modal');
+          const iframe = document.getElementById('review-iframe');
+          if (btn && modal && iframe) {
+            btn.addEventListener('click', function(){ modal.style.display='none'; iframe.src='about:blank'; });
+          }
+        })();
+
+        // Listen for postMessage from leave_review.php
+        window.addEventListener('message', function(ev){
+          const d = ev && ev.data ? ev.data : null;
+          if (!d || typeof d !== 'object') return;
+          if (d.type === 'review_submitted' || d.type === 'review_cancel') {
+            const modal = document.getElementById('review-iframe-modal');
+            const iframe = document.getElementById('review-iframe');
+            if (modal && iframe) { modal.style.display='none'; iframe.src='about:blank'; }
+            if (d.type === 'review_submitted') {
+              // Optionally append a local thank-you system message to the chat
+              try {
+                const container = document.getElementById('chat-scroll');
+                // We already render system messages server-side; keep UI simple here.
+              } catch(_){}
+              // Reload the conversation to reflect new system message state
+              try { window.location.reload(); } catch(_) {}
+            }
+          }
+        });
+
 
       // Poll every 6s to flip Delivered -> Seen for my messages
       setInterval(refreshSeen, 6000);
