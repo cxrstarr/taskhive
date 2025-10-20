@@ -516,6 +516,11 @@ if ($selectedId > 0) {
           if (window.renderLocalTimes) window.renderLocalTimes();
         } catch(e){}
       }
+        // Helper to validate same-origin URLs
+        function sameOrigin(u){
+          try { const x = new URL(u, window.location.origin); return x.origin === window.location.origin; } catch(_) { return false; }
+        }
+
         // Intercept clicks on Leave a review links inside messages, open modal iframe
         document.addEventListener('click', function(e){
           const a = e.target.closest && e.target.closest('a.leave-review-link');
@@ -525,7 +530,10 @@ if ($selectedId > 0) {
           e.preventDefault();
           const url = new URL(href, window.location.origin);
           url.searchParams.set('modal','1');
-          url.searchParams.set('redirect', window.location.href);
+          // Prefer navigating back to the previous page after cancel
+          const prev = document.referrer && sameOrigin(document.referrer) ? document.referrer : '';
+          window.__reviewReturnUrl = prev || window.location.href;
+          url.searchParams.set('redirect', window.__reviewReturnUrl);
           const iframe = document.getElementById('review-iframe');
           const modal  = document.getElementById('review-iframe-modal');
           if (iframe && modal) {
@@ -560,6 +568,14 @@ if ($selectedId > 0) {
               } catch(_){}
               // Reload the conversation to reflect new system message state
               try { window.location.reload(); } catch(_) {}
+            } else if (d.type === 'review_cancel') {
+              // On cancel, go back to where the user came from if possible
+              try {
+                const back = (typeof window.__reviewReturnUrl === 'string' && sameOrigin(window.__reviewReturnUrl)) ? window.__reviewReturnUrl : (document.referrer && sameOrigin(document.referrer) ? document.referrer : '');
+                if (back) { window.location.href = back; }
+                else if (history.length > 1) { history.back(); }
+                else { window.location.href = 'feed.php'; }
+              } catch(_) {}
             }
           }
         });

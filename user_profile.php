@@ -5,7 +5,7 @@ require_once 'flash.php';
 
 if (empty($_GET['id'])) {
     flash_set('error','Profile not found.');
-    header("Location: mainpage.php"); exit;
+  header("Location: index.php"); exit;
 }
 $db = new database();
 $viewer_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
@@ -14,7 +14,7 @@ $profile_id = (int)$_GET['id'];
 $public = $db->getPublicProfile($profile_id);
 if (!$public) {
     flash_set('error','User profile not found.');
-    header("Location: mainpage.php"); exit;
+  header("Location: index.php"); exit;
 }
 
 $isSelf = $viewer_id === $profile_id;
@@ -54,7 +54,7 @@ if (($public['user_type'] ?? '') === 'freelancer' && !empty($public['skills'])) 
 <body>
 <div class="container py-4 profile-wrapper">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <a href="mainpage.php#feed" class="btn btn-sm btn-outline-secondary">&larr; Back to Feed</a>
+  <a href="feed.php" class="btn btn-sm btn-outline-secondary">&larr; Back to Feed</a>
     <div class="d-flex gap-2">
       <?php if ($canMessage): ?>
         <form method="POST" action="start_conversation.php" class="d-inline">

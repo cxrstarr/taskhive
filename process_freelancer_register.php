@@ -4,7 +4,7 @@ require_once 'database.php';
 require_once 'flash.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: freelancer_register.php"); exit;
+    header("Location: freelancer.php"); exit;
 }
 
 $first = trim($_POST['first_name']??'');
@@ -19,15 +19,15 @@ $bio = trim($_POST['bio']??'');
 
 if (!$first || !$last || !$email || !$password || !$skills || !$address || !$bio) {
     flash_set('error','Fill all required fields.');
-    header("Location: freelancer_register.php"); exit;
+    header("Location: freelancer.php"); exit;
 }
 if (!filter_var($email,FILTER_VALIDATE_EMAIL)) {
     flash_set('error','Invalid email.');
-    header("Location: freelancer_register.php"); exit;
+    header("Location: freelancer.php"); exit;
 }
 if (strlen($password) < 8) {
     flash_set('error','Password too short.');
-    header("Location: freelancer_register.php"); exit;
+    header("Location: freelancer.php"); exit;
 }
 
 $profile_picture = null;
@@ -36,14 +36,14 @@ if (!empty($_FILES['profile_picture']['name'])) {
         $ext = strtolower(pathinfo($_FILES['profile_picture']['name'], PATHINFO_EXTENSION));
         if (!in_array($ext,['jpg','jpeg','png','gif','webp'])) {
             flash_set('error','Unsupported image type.');
-            header("Location: freelancer_register.php"); exit;
+            header("Location: freelancer.php"); exit;
         }
         if (!is_dir('uploads')) mkdir('uploads',0775,true);
         $profile_picture = 'uploads/'.time().'_'.bin2hex(random_bytes(4)).'.'.$ext;
         move_uploaded_file($_FILES['profile_picture']['tmp_name'], $profile_picture);
     } else {
-        flash_set('error','Upload error.');
-        header("Location: freelancer_register.php"); exit;
+    flash_set('error','Upload error.');
+    header("Location: freelancer.php"); exit;
     }
 }
 
@@ -51,7 +51,7 @@ $db = new database();
 $user_id = $db->registerFreelancer($first,$last,$email,$password,$skills,$address,$hourly_rate,$phone,$profile_picture);
 if (!$user_id) {
     flash_set('error','Email already in use or error encountered.');
-    header("Location: freelancer_register.php"); exit;
+    header("Location: freelancer.php"); exit;
 }
 
 $db->updateUserProfile($user_id, ['bio'=>$bio]);

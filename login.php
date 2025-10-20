@@ -601,7 +601,7 @@ unset($_SESSION['login_errors']);
 
                 <!-- Forgot Password -->
                 <div class="forgot-password">
-                    <a href="forgot-password.php">Forgot password?</a>
+                    <a href="unavail.php">Forgot password?</a>
                 </div>
 
                 <!-- Submit Button -->

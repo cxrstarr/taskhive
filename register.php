@@ -531,9 +531,9 @@
             
             setTimeout(() => {
                 if (role === 'freelancer') {
-                    window.location.href = 'freelancer_register.php';
+                    window.location.href = 'freelancer.php';
                 } else {
-                    window.location.href = 'client_register.php';
+                    window.location.href = 'client.php';
                 }
             }, 200);
         }

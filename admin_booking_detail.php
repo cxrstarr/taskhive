@@ -42,7 +42,7 @@ $messages = $db->opencon()->query("SELECT * FROM messages WHERE booking_id=$book
     <div>Status: <?= htmlspecialchars($dispute['status']) ?></div>
     <div>Reason: <?= htmlspecialchars($dispute['reason_code']) ?></div>
     <div>Description: <?= htmlspecialchars($dispute['description']) ?></div>
-    <form method="POST" action="admin_dispute_action.php">
+  <form method="POST" action="unavail.php">
       <input type="hidden" name="dispute_id" value="<?= (int)$dispute['dispute_id'] ?>">
       <input type="text" name="resolution" placeholder="Resolution notes" class="form-control mb-2" />
       <button class="btn btn-success" name="action" value="resolve">Resolve</button>

@@ -4,7 +4,7 @@ require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/flash.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: mainpage.php"); exit;
+    header("Location: index.php"); exit;
 }
 if (empty($_SESSION['user_id'])) {
     flash_set('error','Login required.');

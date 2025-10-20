@@ -431,7 +431,7 @@ try { $unreadCount = (int)$db->countUnreadMessages($uid); } catch (Throwable $e)
                                     <span>View Dashboard</span>
                                 </a>
                                 
-                                <a href="settings.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
+                                <a href="unavail.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
                                     <i data-lucide="settings" class="w-5 h-5 text-amber-600"></i>
                                     <span>Settings</span>
                                 </a>
@@ -468,7 +468,7 @@ try { $unreadCount = (int)$db->countUnreadMessages($uid); } catch (Throwable $e)
                     <?php endif; ?>
                 </a>
 
-                <a href="feed-enhanced.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
+                <a href="feed.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
                     <i data-lucide="compass" class="w-5 h-5"></i>
                     <span class="font-medium tracking-wide">Browse Services</span>
                 </a>
@@ -484,11 +484,11 @@ try { $unreadCount = (int)$db->countUnreadMessages($uid); } catch (Throwable $e)
 
             <!-- Bottom Section -->
             <div class="px-3 py-4 border-t border-white/10 space-y-1">
-                <a href="settings.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
+                <a href="unavail.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
                     <i data-lucide="settings" class="w-5 h-5"></i>
                     <span class="font-medium tracking-wide">Settings</span>
                 </a>
-                <a href="help.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
+                <a href="unavail.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
                     <i data-lucide="help-circle" class="w-5 h-5"></i>
                     <span class="font-medium tracking-wide">Help & Support</span>
                 </a>

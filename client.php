@@ -18,7 +18,7 @@ require_once 'flash.php';
   <div class="register-card" style="max-width:650px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h2 class="mb-0">🐝 Client Registration</h2>
-      <a href="mainpage.php#feed" class="btn btn-sm btn-outline-secondary">&larr; Back</a>
+  <a href="feed.php" class="btn btn-sm btn-outline-secondary">&larr; Back</a>
     </div>
     <p class="text-muted text-center">Hire trusted local freelancers.</p>
     <form method="POST" action="process_client_register.php" enctype="multipart/form-data" novalidate>

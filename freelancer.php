@@ -18,7 +18,7 @@ require_once 'flash.php';
   <div class="register-card">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h2 class="mb-0">🐝 Freelancer Registration</h2>
-      <a href="mainpage.php#feed" class="btn btn-sm btn-outline-secondary">&larr; Back</a>
+  <a href="feed.php" class="btn btn-sm btn-outline-secondary">&larr; Back</a>
     </div>
     <p class="text-muted text-center">Showcase your skills & start earning.</p>
     <form method="POST" action="process_freelancer_register.php" enctype="multipart/form-data" novalidate>

@@ -3,7 +3,7 @@ session_start();
 require_once __DIR__.'/database.php';
 require_once __DIR__.'/flash.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: mainpage.php'); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: index.php'); exit; }
 if (empty($_SESSION['user_id'])) { flash_set('error','Login required.'); header('Location: login.php'); exit; }
 
 $task            = $_POST['task'] ?? '';

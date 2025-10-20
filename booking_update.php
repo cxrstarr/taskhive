@@ -5,7 +5,7 @@ require_once __DIR__ . '/flash.php';
 
 // Supports both form POST and AJAX fetch
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: mainpage.php');
+    header('Location: index.php');
     exit;
 }
 

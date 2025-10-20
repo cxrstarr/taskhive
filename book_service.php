@@ -9,7 +9,7 @@ require_once 'flash.php';
  */
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: mainpage.php"); exit;
+    header("Location: index.php"); exit;
 }
 
 if (empty($_SESSION['user_id']) || ($_SESSION['user_type'] ?? '') !== 'client') {
@@ -25,7 +25,7 @@ $return_slug     = trim($_POST['return_slug'] ?? ''); // so we can go back to sa
 
 if ($service_id <= 0) {
     flash_set('error','Invalid service.');
-    header("Location: ".($return_slug ? 'service.php?slug='.urlencode($return_slug) : 'mainpage.php#feed'));
+    header("Location: ".($return_slug ? 'service.php?slug='.urlencode($return_slug) : 'feed.php'));
     exit;
 }
 
@@ -33,7 +33,7 @@ $db = new database();
 $service = $db->getService($service_id);
 if (!$service) {
     flash_set('error','Service not found.');
-    header("Location: ".($return_slug ? 'service.php?slug='.urlencode($return_slug) : 'mainpage.php#feed'));
+    header("Location: ".($return_slug ? 'service.php?slug='.urlencode($return_slug) : 'feed.php'));
     exit;
 }
 

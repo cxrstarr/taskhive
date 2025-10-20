@@ -4,7 +4,7 @@ require_once 'database.php';
 require_once 'flash.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: mainpage.php"); exit;
+    header("Location: index.php"); exit;
 }
 
 if (empty($_SESSION['user_id']) || ($_SESSION['user_type'] ?? '') !== 'freelancer') {

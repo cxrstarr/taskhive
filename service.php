@@ -5,7 +5,7 @@ require_once 'flash.php';
 
 if (empty($_GET['slug'])) {
     flash_set('error','Service not found.');
-    header("Location: mainpage.php"); exit;
+  header("Location: index.php"); exit;
 }
 
 $db  = new database();
@@ -23,7 +23,7 @@ $svc = $stmt->fetch();
 
 if (!$svc) {
     flash_set('error','Service not found or inactive.');
-    header("Location: mainpage.php"); exit;
+  header("Location: index.php"); exit;
 }
 
 $currentUser = null;
@@ -54,13 +54,13 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
 <body class="bg-light">
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <div class="container">
-    <a href="mainpage.php" class="navbar-brand fw-bold text-warning">TaskHive 🐝</a>
+  <a href="index.php" class="navbar-brand fw-bold text-warning">TaskHive 🐝</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navMain">
       <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="mainpage.php#feed">Feed</a></li>
+  <li class="nav-item"><a class="nav-link" href="feed.php">Feed</a></li>
         <?php if ($currentUser): 
           $dashboard = $currentUser['user_type']==='freelancer' ? 'freelancer_profile.php' : 'client_profile.php';
         ?>
@@ -70,7 +70,7 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><a class="dropdown-item" href="dashboard.php">View Dashboard</a></li>
-              <li><a class="dropdown-item" href="settings.php">Settings</a></li>
+              <li><a class="dropdown-item" href="unavail.php">Settings</a></li>
               <li><a class="dropdown-item" href="logout.php">Logout</a></li>
             </ul>
           </li>
@@ -84,7 +84,7 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
 </nav>
 
 <div class="container py-5">
-  <a href="mainpage.php#feed" class="btn btn-sm btn-secondary mb-4">&larr; Back</a>
+  <a href="feed.php" class="btn btn-sm btn-secondary mb-4">&larr; Back</a>
   <div class="card shadow-sm p-4">
     <div class="d-flex align-items-center mb-3">
       <img src="<?= htmlspecialchars($svc['profile_picture'] ?: 'img/client1.webp'); ?>" class="rounded-circle me-3 avatar-sm" alt="avatar">

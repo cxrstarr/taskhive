@@ -298,7 +298,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
        . '</div></div>';
    echo '<div class="mt-3 d-flex flex-wrap gap-2">';
    if ($rid) {
-    echo '<form method="POST" action="admin_report_action.php" class="d-inline">'
+  echo '<form method="POST" action="unavail.php" class="d-inline">'
       . '<input type="hidden" name="report_id" value="'.(int)$rid.'">'
       . '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>'
       . '</form>';
@@ -327,7 +327,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
     echo '<div class="border rounded p-2 bg-white" style="max-height:160px;overflow:auto;white-space:pre-wrap;">'.nl2br(h($s['description'] ?? '')).'</div>';
    echo '<div class="mt-3 d-flex flex-wrap gap-2">';
    if ($rid) {
-    echo '<form method="POST" action="admin_report_action.php" class="d-inline">'
+  echo '<form method="POST" action="unavail.php" class="d-inline">'
       . '<input type="hidden" name="report_id" value="'.(int)$rid.'">'
       . '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>'
       . '</form>';
@@ -359,7 +359,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
     }
     echo '<div class="mt-3 d-flex flex-wrap gap-2">';
     if ($rid) {
-      echo '<form method="POST" action="admin_report_action.php" class="d-inline">'
+  echo '<form method="POST" action="unavail.php" class="d-inline">'
          . '<input type="hidden" name="report_id" value="'.(int)$rid.'">'
          . '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>'
          . '</form>';
@@ -444,10 +444,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
         <li class="nav-item"><a href="?view=analytics" class="nav-link <?= active($view,'analytics') ?>"><i class="bi bi-graph-up-arrow"></i>Analytics</a></li>
         <li class="nav-item"><a href="?view=reports" class="nav-link <?= active($view,'reports') ?>"><i class="bi bi-flag"></i>Reports</a></li>
   <li class="nav-item"><a href="?view=system" class="nav-link <?= active($view,'system') ?>"><i class="bi bi-gear"></i>System Check</a></li>
-        <li class="nav-item mt-2"><a href="admin_export.php?type=users" class="nav-link"><i class="bi bi-download"></i>Export Users</a></li>
-        <li class="nav-item"><a href="admin_export.php?type=bookings" class="nav-link"><i class="bi bi-download"></i>Export Bookings</a></li>
-        <li class="nav-item"><a href="admin_export.php?type=payments" class="nav-link"><i class="bi bi-download"></i>Export Payments</a></li>
-        <li class="nav-item mt-3"><a href="admin_logout.php" class="nav-link text-danger"><i class="bi bi-box-arrow-right"></i>Logout</a></li>
+  <li class="nav-item mt-2"><a href="unavail.php" class="nav-link"><i class="bi bi-download"></i>Export Users</a></li>
+  <li class="nav-item"><a href="unavail.php" class="nav-link"><i class="bi bi-download"></i>Export Bookings</a></li>
+  <li class="nav-item"><a href="unavail.php" class="nav-link"><i class="bi bi-download"></i>Export Payments</a></li>
+  <li class="nav-item mt-3"><a href="unavail.php" class="nav-link text-danger"><i class="bi bi-box-arrow-right"></i>Logout</a></li>
       </ul>
       <div class="px-3 pb-3 text-secondary small mt-auto">&copy; <?= date('Y') ?> TaskHive</div>
     </nav>
@@ -574,9 +574,9 @@ switch ($view) {
         <h5 class="mb-2">Platform Revenue</h5>
         <div class="fs-3 fw-bold text-success">₱<?= number_format((float)$totalRevenue,2) ?></div>
         <div class="mt-3">
-          <a href="admin_export.php?type=bookings" class="btn btn-outline-secondary btn-sm me-2">Export Bookings CSV</a>
-          <a href="admin_export.php?type=payments" class="btn btn-outline-secondary btn-sm me-2">Export Payments CSV</a>
-          <a href="admin_export.php?type=users" class="btn btn-outline-secondary btn-sm">Export Users CSV</a>
+          <a href="unavail.php" class="btn btn-outline-secondary btn-sm me-2">Export Bookings CSV</a>
+          <a href="unavail.php" class="btn btn-outline-secondary btn-sm me-2">Export Payments CSV</a>
+          <a href="unavail.php" class="btn btn-outline-secondary btn-sm">Export Users CSV</a>
         </div>
       </div>
 

@@ -12,7 +12,7 @@ require_once __DIR__.'/flash.php';
     - report_type: one of service|message|review|booking|user
     - target_id:   integer id of the target
     - description: text (optional but recommended)
-    - return:      URL to redirect back to (optional; defaults to mainpage.php)
+  - return:      URL to redirect back to (optional; defaults to index.php)
 
   Behavior:
     - Validates login and inputs
@@ -32,7 +32,7 @@ $allowedTypes = ['service','message','review','booking','user'];
 $report_type  = $_POST['report_type'] ?? '';
 $target_id    = (int)($_POST['target_id'] ?? 0);
 $description  = trim($_POST['description'] ?? '');
-$return       = trim($_POST['return'] ?? 'mainpage.php');
+$return       = trim($_POST['return'] ?? 'index.php');
 
 if (!in_array($report_type, $allowedTypes, true) || $target_id <= 0) {
   flash_set('error','Invalid report.');
