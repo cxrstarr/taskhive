@@ -2,13 +2,11 @@
 // Start session
 session_start();
 
-// If user is already logged in, redirect to dashboard
-// if (isset($_SESSION['user_id'])) {
-//     $type = $_SESSION['user_type'] ?? 'client';
-//     $dashboardPage = ($type === 'freelancer') ? 'freelancer_dashboard.php' : 'client_dashboard.php';
-//     header('Location: ' . $dashboardPage);
-//     exit();
-// }
+// If user is already logged in, redirect to home page
+if (isset($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit();
+}
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -41,9 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_name'] = ($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '');
                 $_SESSION['user_type'] = $user['user_type'] ?? 'client';
 
-                // Redirect based on user type
-                $dashboardPage = ($_SESSION['user_type'] === 'freelancer') ? 'freelancer_dashboard.php' : 'client_dashboard.php';
-                header('Location: ' . $dashboardPage);
+                // Redirect to home page after successful login
+                header('Location: index.php');
                 exit();
             } else {
                 $errors[] = 'Invalid email or password';
