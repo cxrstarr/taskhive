@@ -1595,7 +1595,7 @@ try {
                         const conv = conversations[currentMessageId];
                         const container = document.getElementById('message-conversation');
                         let lastTs = null;
-                        data.messages.forEach(m => {
+                        data.messages.forEach(async m => {
                             const isMe = (m.sender_id === <?php echo (int)$uid; ?>);
                             const mtype = String(m.type || m.message_type || m.meta_type || '').toLowerCase();
                             const isSystem = !m.sender_id || m.is_system === 1 || ['system','status','payment','event'].includes(mtype) || (typeof m.body === 'string' && m.body.trim().startsWith('System:'));
@@ -1610,6 +1610,22 @@ try {
                             container.appendChild(renderMessageBubble(conv, msg));
                             if (m.message_id > latestMessageId) latestMessageId = m.message_id;
                             lastTs = m.created_at;
+
+                            // If freelancer accepted the booking, refresh booking/payment context and UI
+                            if (isSystem && typeof msg.content === 'string' && /accepted your booking/i.test(msg.content)) {
+                                try {
+                                    const r = await fetch(`api/booking_ctx.php?conversation_id=${currentMessageId}`, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+                                    const j = await r.json();
+                                    if (j && j.ok) {
+                                        conversations[currentMessageId] = {
+                                            ...conversations[currentMessageId],
+                                            booking_ctx: j.booking_ctx || null,
+                                            freelancer_methods: Array.isArray(j.freelancer_methods) ? j.freelancer_methods : (conversations[currentMessageId]?.freelancer_methods || [])
+                                        };
+                                        loadConversation(currentMessageId);
+                                    }
+                                } catch (_) { /* ignore */ }
+                            }
                         });
                         lucide.createIcons();
                         container.scrollTop = container.scrollHeight;
