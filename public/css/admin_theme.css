@@ -1,0 +1,131 @@
+/* TaskHive Admin Theme: align admin UI with user-side aesthetics without altering logic */
+
+:root {
+  --th-amber-50: #fffbeb;
+  --th-amber-100: #fef3c7;
+  --th-amber-200: #fde68a;
+  --th-amber-300: #fcd34d;
+  --th-amber-400: #fbbf24;
+  --th-amber-500: #f59e0b;
+  --th-amber-600: #d97706;
+  --th-amber-700: #b45309;
+  --th-amber-800: #92400e;
+  --th-amber-900: #78350f;
+}
+
+/* Background and base */
+body {
+  background: linear-gradient(180deg, var(--th-amber-50), #fff) fixed;
+}
+body.bg-light {
+  background: linear-gradient(180deg, var(--th-amber-50), #fff) fixed !important;
+}
+
+/* Navbar: replace dark with warm gradient while keeping Bootstrap markup */
+.navbar.bg-dark, .navbar.navbar-dark {
+  background: linear-gradient(90deg, var(--th-amber-600), var(--th-amber-500)) !important;
+}
+.navbar .navbar-brand, .navbar .nav-link, .navbar .btn-outline-light, .navbar .btn {
+  color: #fff !important;
+}
+.navbar .btn-outline-light {
+  border-color: rgba(255,255,255,0.7) !important;
+}
+.navbar .btn-outline-light:hover {
+  background: rgba(255,255,255,0.12) !important;
+}
+
+/* Containers and sections */
+.container, .container-fluid {
+  padding-top: 1rem;
+  padding-bottom: 2rem;
+}
+
+/* Card-like wrappers for tables */
+.table, .table-responsive {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+}
+.table thead th {
+  background: linear-gradient(180deg, #fff, var(--th-amber-50));
+  border-bottom: 2px solid var(--th-amber-200) !important;
+}
+.table tbody tr:hover {
+  background-color: rgba(245, 158, 11, 0.06);
+}
+
+/* Buttons - warm amber palette */
+.btn-primary {
+  background: linear-gradient(90deg, var(--th-amber-500), var(--th-amber-600));
+  border-color: var(--th-amber-600);
+}
+.btn-primary:hover {
+  background: linear-gradient(90deg, var(--th-amber-600), var(--th-amber-700));
+  border-color: var(--th-amber-700);
+}
+.btn-outline-primary {
+  color: var(--th-amber-700);
+  border-color: var(--th-amber-400);
+}
+.btn-outline-primary:hover {
+  background: var(--th-amber-50);
+  border-color: var(--th-amber-500);
+  color: var(--th-amber-800);
+}
+.btn-success {
+  background: linear-gradient(90deg, #16a34a, #15803d);
+  border-color: #15803d;
+}
+.btn-warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  border-color: #d97706;
+  color: #fff;
+}
+.btn-danger {
+  background: linear-gradient(90deg, #ef4444, #b91c1c);
+  border-color: #b91c1c;
+}
+
+/* Badges: soften to the same palette */
+.badge.bg-info { background-color: var(--th-amber-500) !important; }
+.badge.bg-warning { background-color: var(--th-amber-400) !important; }
+.badge.bg-secondary { background-color: #64748b !important; }
+
+/* Forms */
+input.form-control, select.form-select, textarea.form-control {
+  border-color: var(--th-amber-200);
+}
+input.form-control:focus, select.form-select:focus, textarea.form-control:focus {
+  box-shadow: 0 0 0 .2rem rgba(245, 158, 11, .15);
+  border-color: var(--th-amber-400);
+}
+
+/* Section titles */
+h1, h2, h3, .fw-semibold {
+  color: #111827;
+}
+
+/* Utility helpers to mirror user-side spacing */
+.th-section {
+  background: #fff;
+  border: 1px solid var(--th-amber-200);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+/* Tables fine-tuning */
+.table td, .table th {
+  vertical-align: middle;
+}
+
+/* Links */
+a { color: var(--th-amber-700); }
+a:hover { color: var(--th-amber-800); }
+
+/* Modals and offcanvas (used by admin_dashboard ajax fragments) */
+.modal-content {
+  border-radius: 16px;
+  border: 1px solid var(--th-amber-200);
+}

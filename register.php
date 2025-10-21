@@ -528,12 +528,11 @@
             // Add a nice animation before redirecting
             const card = document.querySelector(`.role-card.${role}`);
             card.style.transform = 'scale(0.95)';
-            
             setTimeout(() => {
                 if (role === 'freelancer') {
-                    window.location.href = 'freelancer.php';
+                    window.location.href = 'freelancer_register.php';
                 } else {
-                    window.location.href = 'client.php';
+                    window.location.href = 'client_register.php';
                 }
             }, 200);
         }

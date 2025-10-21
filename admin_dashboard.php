@@ -382,6 +382,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
   <link rel="icon" type="image/png" href="img/bee.jpg">
   <meta charset="UTF-8">
   <title>TaskHive Admin</title>
+  <link rel="stylesheet" href="public/css/admin_theme.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -437,13 +438,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
         <li class="nav-item"><a href="?view=commissions" class="nav-link <?= active($view,'commissions') ?>"><i class="bi bi-cash-coin"></i>Commissions</a></li>
         <li class="nav-item"><a href="?view=reviews" class="nav-link <?= active($view,'reviews') ?>"><i class="bi bi-star"></i>Reviews</a></li>
         <li class="nav-item"><a href="?view=flagged_reviews" class="nav-link <?= active($view,'flagged_reviews') ?>"><i class="bi bi-exclamation-octagon"></i>Flagged Reviews</a></li>
-        <li class="nav-item"><a href="?view=disputes" class="nav-link <?= active($view,'disputes') ?>"><i class="bi bi-slash-circle"></i>Disputes</a></li>
+  <!-- <li class="nav-item"><a href="?view=disputes" class="nav-link <?= active($view,'disputes') ?>"><i class="bi bi-slash-circle"></i>Disputes</a></li> -->
         <li class="nav-item"><a href="?view=suspended" class="nav-link <?= active($view,'suspended') ?>"><i class="bi bi-person-x"></i>Suspended Users</a></li>
         <li class="nav-item"><a href="?view=notifications" class="nav-link <?= active($view,'notifications') ?>"><i class="bi bi-bell"></i>Notifications</a></li>
         <li class="nav-item"><a href="?view=notify_user" class="nav-link <?= active($view,'notify_user') ?>"><i class="bi bi-envelope"></i>Send Notification</a></li>
         <li class="nav-item"><a href="?view=analytics" class="nav-link <?= active($view,'analytics') ?>"><i class="bi bi-graph-up-arrow"></i>Analytics</a></li>
-        <li class="nav-item"><a href="?view=reports" class="nav-link <?= active($view,'reports') ?>"><i class="bi bi-flag"></i>Reports</a></li>
-  <li class="nav-item"><a href="?view=system" class="nav-link <?= active($view,'system') ?>"><i class="bi bi-gear"></i>System Check</a></li>
+  <!-- <li class="nav-item"><a href="?view=reports" class="nav-link <?= active($view,'reports') ?>"><i class="bi bi-flag"></i>Reports</a></li> -->
+  <!-- <li class="nav-item"><a href="?view=system" class="nav-link <?= active($view,'system') ?>"><i class="bi bi-gear"></i>System Check</a></li> -->
   <li class="nav-item mt-2"><a href="unavail.php" class="nav-link"><i class="bi bi-download"></i>Export Users</a></li>
   <li class="nav-item"><a href="unavail.php" class="nav-link"><i class="bi bi-download"></i>Export Bookings</a></li>
   <li class="nav-item"><a href="unavail.php" class="nav-link"><i class="bi bi-download"></i>Export Payments</a></li>

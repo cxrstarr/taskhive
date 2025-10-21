@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="icon" type="image/png" href="img/bee.jpg">
   <meta charset="UTF-8">
   <title>Admin Login - TaskHive</title>
+  <link rel="stylesheet" href="public/css/admin_theme.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
