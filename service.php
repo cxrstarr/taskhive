@@ -70,7 +70,7 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><a class="dropdown-item" href="dashboard.php">View Dashboard</a></li>
-              <li><a class="dropdown-item" href="unavail.php">Settings</a></li>
+              <li><a class="dropdown-item" href="settings.php">Settings</a></li>
               <li><a class="dropdown-item" href="logout.php">Logout</a></li>
             </ul>
           </li>

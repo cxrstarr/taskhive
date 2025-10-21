@@ -247,7 +247,7 @@ if (!empty($_SESSION['user_id'])) {
                                         <i data-lucide="user" class="w-5 h-5 text-amber-600"></i>
                                         <span>View Dashboard</span>
                                     </a>
-                                    <a href="unavail.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
+                                    <a href="settings.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
                                         <i data-lucide="settings" class="w-5 h-5 text-amber-600"></i>
                                         <span>Settings</span>
                                     </a>
@@ -292,7 +292,7 @@ if (!empty($_SESSION['user_id'])) {
                             </div>
                         </div>
                         <a href="dashboard.php" class="block w-full text-center py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">View Dashboard</a>
-                        <a href="unavail.php" class="block w-full text-center py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">Settings</a>
+                        <a href="settings.php" class="block w-full text-center py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">Settings</a>
                         <a href="logout.php" class="block w-full text-center py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-full shadow-lg">Logout</a>
                     <?php else: ?>
                         <button id="btn-signin-mobile" class="w-full py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">Sign In</button>

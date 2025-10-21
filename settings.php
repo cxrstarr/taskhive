@@ -1,19 +1,35 @@
 <?php
-// Mock user data
+// Real user data from session/DB
+session_start();
+require_once __DIR__ . '/database.php';
+$db = new database();
+
+// Redirect if not logged in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+$uid = (int)$_SESSION['user_id'];
+$u = $db->getUser($uid);
+if (!$u) {
+    header('Location: login.php');
+    exit();
+}
+
 $currentUser = [
-    'name' => 'Cayte Tan',
-    'email' => 'cayte.tan@taskhive.com',
-    'avatar' => 'https://images.unsplash.com/photo-1581065178047-8ee15951ede6?w=200'
+    'name'  => trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: ($u['email'] ?? 'User'),
+    'email' => (string)($u['email'] ?? ''),
+    'avatar'=> ($u['profile_picture'] ?? '') ? (string)$u['profile_picture'] : 'img/profile_icon.webp',
 ];
 
-// Mock notifications
-$notifications = [
-    ['id' => 1, 'message' => 'New service request from John Doe', 'time' => '5 min ago', 'unread' => true],
-    ['id' => 2, 'message' => 'Your service "Web Development" was approved', 'time' => '1 hour ago', 'unread' => true],
-    ['id' => 3, 'message' => 'Payment received: ₱1,500.00', 'time' => '2 hours ago', 'unread' => false],
-];
+// Use unread messages count as a lightweight notification badge for now
+$unreadCount = 0;
+try { $unreadCount = $db->countUnreadMessages($uid); } catch (Throwable $e) { $unreadCount = 0; }
+$unreadNotifications = $unreadCount;
 
-$unreadNotifications = count(array_filter($notifications, fn($n) => $n['unread']));
+// Optional: real notifications could be fetched from a notifications table if needed
+$notifications = [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -369,7 +385,7 @@ $unreadNotifications = count(array_filter($notifications, fn($n) => $n['unread']
                     <span class="px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full font-semibold">3</span>
                 </a>
 
-                <a href="feed-enhanced.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
+                <a href="feed.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
                     <i data-lucide="compass" class="w-5 h-5"></i>
                     <span class="font-medium tracking-wide">Browse Services</span>
                 </a>
@@ -489,7 +505,7 @@ $unreadNotifications = count(array_filter($notifications, fn($n) => $n['unread']
 
                         <!-- Back Button -->
                         <div class="fade-in-up delay-1000">
-                            <a href="feed-enhanced.php" class="back-button group inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg">
+                            <a href="feed.php" class="back-button group inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg">
                                 <!-- Arrow Left Icon -->
                                 <svg class="arrow-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>

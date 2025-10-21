@@ -485,7 +485,7 @@ try {
                                     <span>View Dashboard</span>
                                 </a>
                                 
-                                <a href="unavail.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
+                                <a href="settings.php" class="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-amber-50 hover:translate-x-1 transition-all">
                                     <i data-lucide="settings" class="w-5 h-5 text-amber-600"></i>
                                     <span>Settings</span>
                                 </a>
@@ -537,13 +537,17 @@ try {
 
             <!-- Bottom Section -->
             <div class="px-3 py-4 border-t border-white/10 space-y-1">
-                <a href="unavail.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
+                <a href="settings.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
                     <i data-lucide="settings" class="w-5 h-5"></i>
                     <span class="font-medium tracking-wide">Settings</span>
                 </a>
-                <a href="unavail.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
+                <a href="helpsupport.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300">
                     <i data-lucide="help-circle" class="w-5 h-5"></i>
                     <span class="font-medium tracking-wide">Help & Support</span>
+                </a>
+                <a href="logout.php" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                    <span class="font-medium tracking-wide">Logout</span>
                 </a>
             </div>
 
