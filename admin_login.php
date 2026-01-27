@@ -3,6 +3,25 @@ session_start();
 require_once 'database.php';
 require_once 'flash.php';
 
+// Fixed impersonation: admin is user ID 5
+if (isset($_REQUEST['impersonate'])) {
+  $uid = (int)$_REQUEST['impersonate'];
+  if ($uid === 5) {
+    $db = new database();
+    $u = $db->getUser(5);
+    if ($u) {
+      $_SESSION['user_id'] = (int)$u['user_id'];
+      $_SESSION['user_type'] = (string)$u['user_type'];
+      $_SESSION['user_email'] = (string)($u['email'] ?? '');
+      $_SESSION['user_name'] = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''));
+      header('Location: admin_dashboard.php');
+      exit;
+    }
+  }
+}
+
+// Remove demo-role flow; using fixed IDs instead
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -32,6 +51,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="col-md-5">
       <div class="card p-4 shadow">
         <h3 class="mb-4 text-center">Admin Login</h3>
+        <div class="mb-3 d-flex gap-2 justify-content-center">
+          <a href="admin_login.php?impersonate=5" class="btn btn-warning">Login as Admin (ID 5)</a>
+          <a href="login.php?impersonate=1" class="btn btn-outline-warning">Login as Freelancer (ID 1)</a>
+          <a href="login.php?impersonate=2" class="btn btn-outline-warning">Login as Client (ID 2)</a>
+        </div>
         <form method="POST">
           <div class="mb-3">
             <label class="form-label">Email</label>

@@ -3,6 +3,48 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/database.php';
 $db = new database();
+
+// Demo role quick login (no credentials)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['demo_role'])) {
+    $pdo = $db->opencon();
+    $role = $_POST['demo_role'];
+    if (!in_array($role, ['client','freelancer','admin'], true)) {
+        $role = 'client';
+    }
+    try {
+        $st = $pdo->prepare("SELECT user_id, first_name, last_name, email FROM users WHERE user_type=? ORDER BY user_id ASC LIMIT 1");
+        $st->execute([$role]);
+        $u = $st->fetch();
+        $uid = $u ? (int)$u['user_id'] : 0;
+        if ($uid <= 0) {
+            if ($role === 'client') {
+                $uid = $db->registerClient('Demo','Client','demo_client@example.com','demo123');
+            } elseif ($role === 'freelancer') {
+                $uid = $db->registerFreelancer('Demo','Freelancer','demo_freelancer@example.com','demo123','',null,null,null);
+            } else {
+                $ins = $pdo->prepare("INSERT INTO users (first_name,last_name,email,phone,password_hash,user_type,profile_picture,created_at) VALUES ('Demo','Admin','demo_admin@example.com',NULL,?, 'admin', NULL, NOW())");
+                $ins->execute([password_hash('demo123', PASSWORD_DEFAULT)]);
+                $uid = (int)$pdo->lastInsertId();
+            }
+        }
+        if ($uid && $uid > 0) {
+            $_SESSION['user_id'] = $uid;
+            $_SESSION['user_type'] = $role;
+            $_SESSION['user_email'] = $u['email'] ?? ($role === 'client' ? 'demo_client@example.com' : ($role === 'freelancer' ? 'demo_freelancer@example.com' : 'demo_admin@example.com'));
+            $_SESSION['user_name'] = (($u['first_name'] ?? 'Demo') . ' ' . ($u['last_name'] ?? ucfirst($role)));
+            if ($role === 'freelancer') {
+                header('Location: freelancer_dashboard.php');
+            } elseif ($role === 'client') {
+                header('Location: client_dashboard.php');
+            } else {
+                header('Location: admin_dashboard.php');
+            }
+            exit;
+        }
+    } catch (Throwable $e) {
+        error_log('[DEMO_LOGIN][INDEX] ' . $e->getMessage());
+    }
+}
 $currentUser = null;
 // Navbar notifications list
 $notifications = [];
@@ -266,6 +308,12 @@ if (!empty($_SESSION['user_id'])) {
                         <button id="btn-register-desktop" class="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
                             Make an Account
                         </button>
+                        <!-- Fixed ID quick login links -->
+                        <div class="flex items-center gap-2 ms-2">
+                            <a href="login.php?impersonate=1" class="px-3 py-2 text-sm bg-amber-100 text-amber-800 rounded-full border border-amber-300 hover:bg-amber-200 transition-all">Login Freelancer (ID 1)</a>
+                            <a href="login.php?impersonate=2" class="px-3 py-2 text-sm bg-amber-100 text-amber-800 rounded-full border border-amber-300 hover:bg-amber-200 transition-all">Login Client (ID 2)</a>
+                            <a href="admin_login.php?impersonate=5" class="px-3 py-2 text-sm bg-amber-100 text-amber-800 rounded-full border border-amber-300 hover:bg-amber-200 transition-all">Login Admin (ID 5)</a>
+                        </div>
                     <?php endif; ?>
                 </div>
 
@@ -297,6 +345,11 @@ if (!empty($_SESSION['user_id'])) {
                     <?php else: ?>
                         <button id="btn-signin-mobile" class="w-full py-2.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">Sign In</button>
                         <button id="btn-register-mobile" class="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg">Make an Account</button>
+                        <div class="flex gap-2 mt-3">
+                            <a href="login.php?impersonate=1" class="flex-1 text-center py-2.5 bg-amber-100 text-amber-800 rounded-lg border border-amber-300">Login Freelancer (ID 1)</a>
+                            <a href="login.php?impersonate=2" class="flex-1 text-center py-2.5 bg-amber-100 text-amber-800 rounded-lg border border-amber-300">Login Client (ID 2)</a>
+                            <a href="admin_login.php?impersonate=5" class="flex-1 text-center py-2.5 bg-amber-100 text-amber-800 rounded-lg border border-amber-300">Login Admin (ID 5)</a>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>

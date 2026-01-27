@@ -8,6 +8,30 @@ if (isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Fixed impersonation by user ID (freelancer=1, client=2, admin=5)
+if (isset($_REQUEST['impersonate'])) {
+    $uid = (int)$_REQUEST['impersonate'];
+    if (in_array($uid, [1,2,5], true)) {
+        require_once 'database.php';
+        $db = new database();
+        $u = $db->getUser($uid);
+        if ($u) {
+            $_SESSION['user_id'] = (int)$u['user_id'];
+            $_SESSION['user_type'] = (string)$u['user_type'];
+            $_SESSION['user_email'] = (string)($u['email'] ?? '');
+            $_SESSION['user_name'] = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''));
+            if ($u['user_type'] === 'freelancer') {
+                header('Location: freelancer_dashboard.php');
+            } elseif ($u['user_type'] === 'admin') {
+                header('Location: admin_dashboard.php');
+            } else {
+                header('Location: client_dashboard.php');
+            }
+            exit();
+        }
+    }
+}
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once 'database.php';
@@ -552,6 +576,16 @@ unset($_SESSION['login_errors']);
                 </ul>
             </div>
             <?php endif; ?>
+
+            <!-- Demo Quick Login -->
+            <div class="register-link" style="margin-bottom:1rem;">
+                Quick login as fixed users:
+            </div>
+            <div style="display:flex; gap:0.5rem; justify-content:center; margin-bottom:1.5rem;">
+                <a href="login.php?impersonate=1" class="submit-btn" style="width:auto; padding:0.5rem 1rem; text-align:center; display:inline-block;">Freelancer</a>
+                <a href="login.php?impersonate=2" class="submit-btn" style="width:auto; padding:0.5rem 1rem; text-align:center; display:inline-block;">Client</a>
+                <a href="login.php?impersonate=5" class="submit-btn" style="width:auto; padding:0.5rem 1rem; text-align:center; display:inline-block;">Admin</a>
+            </div>
 
             <!-- Form -->
             <form id="loginForm" class="login-form" method="POST" action="">
