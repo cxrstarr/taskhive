@@ -136,14 +136,51 @@ $unreadCount = $db->countUnreadMessages($uid);
 // Determine which conversation to open initially
 $requestedConvId = 0;
 $requestedUserId = 0;
-// Strictly validate numeric GET params to avoid expressions like "53-2"
-if (isset($_GET['conversation_id'])) {
-    $tmp = filter_var($_GET['conversation_id'], FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ]);
-    if ($tmp !== false) { $requestedConvId = (int)$tmp; }
+$requestedBookingId = 0;
+
+// Strictly validate numeric GET params to avoid expressions like "53-2" or "1 AND 1=1 --"
+$needsRedirect = false;
+
+if (array_key_exists('conversation_id', $_GET)) {
+    $raw = (string)($_GET['conversation_id'] ?? '');
+    if ($raw !== '') {
+        $tmp = filter_var($raw, FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ]);
+        if ($tmp !== false) { $requestedConvId = (int)$tmp; } else { $needsRedirect = true; }
+    } else {
+        $needsRedirect = true;
+    }
 }
-if (isset($_GET['user_id'])) {
-    $tmp = filter_var($_GET['user_id'], FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ]);
-    if ($tmp !== false) { $requestedUserId = (int)$tmp; }
+if (array_key_exists('user_id', $_GET)) {
+    $raw = (string)($_GET['user_id'] ?? '');
+    if ($raw !== '') {
+        $tmp = filter_var($raw, FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ]);
+        if ($tmp !== false) { $requestedUserId = (int)$tmp; } else { $needsRedirect = true; }
+    } else {
+        $needsRedirect = true;
+    }
+}
+if (array_key_exists('booking_id', $_GET)) {
+    $raw = (string)($_GET['booking_id'] ?? '');
+    if ($raw !== '') {
+        $tmp = filter_var($raw, FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ]);
+        if ($tmp !== false) { $requestedBookingId = (int)$tmp; } else { $needsRedirect = true; }
+    } else {
+        $needsRedirect = true;
+    }
+}
+
+// Canonicalize URL by stripping/normalizing invalid numeric params
+if ($needsRedirect) {
+    $qs = $_GET;
+    if ($requestedConvId > 0) { $qs['conversation_id'] = (string)$requestedConvId; } else { unset($qs['conversation_id']); }
+    if ($requestedUserId > 0) { $qs['user_id'] = (string)$requestedUserId; } else { unset($qs['user_id']); }
+    if ($requestedBookingId > 0) { $qs['booking_id'] = (string)$requestedBookingId; } else { unset($qs['booking_id']); }
+    $redir = 'inbox.php';
+    if (!empty($qs)) {
+        $redir .= '?' . http_build_query($qs);
+    }
+    header('Location: ' . $redir);
+    exit;
 }
 $activeConvId = 0;
 if ($requestedConvId && isset($conversations[$requestedConvId])) {

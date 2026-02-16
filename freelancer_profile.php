@@ -1369,8 +1369,8 @@ if ($viewerId) {
             return true;
         }
 
-        // Portfolio modal data injected from PHP
-        const PORTFOLIO_DATA = <?php echo json_encode($portfolioData, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
+        // Portfolio modal data injected from PHP (harden against </script> breakouts)
+        const PORTFOLIO_DATA = <?php echo json_encode($portfolioData, JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
 
         function viewPortfolioItem(id) {
             const data = PORTFOLIO_DATA[String(id)] || PORTFOLIO_DATA[id];

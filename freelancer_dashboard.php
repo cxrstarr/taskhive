@@ -812,8 +812,9 @@ foreach ($reviewRows as $r) {
     <script src="dashboard.js"></script>
     <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
     // Data for services (for edit prefill)
-    const SERVICES_DATA = <?php echo json_encode($services, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
-    const CATEGORY_OPTIONS = <?php echo json_encode($categoryMap, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
+    // Hex-encode characters that can break out of a <script> context (e.g. </script>)
+    const SERVICES_DATA = <?php echo json_encode($services, JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const CATEGORY_OPTIONS = <?php echo json_encode($categoryMap, JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
 
     // Service Modal logic
     function openServiceModal(){

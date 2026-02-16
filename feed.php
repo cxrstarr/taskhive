@@ -83,8 +83,18 @@ if ($currentUser && ($currentUser['user_type'] ?? '') === 'client' && $_SERVER['
     if (!csrf_validate()) { header('Location: feed.php'); exit; }
     try {
         $viewerId = (int)($_SESSION['user_id'] ?? 0);
-        $svcId = (int)($_POST['service_id'] ?? 0);
-        $freelancerId = (int)($_POST['freelancer_id'] ?? 0);
+        $svcId = 0;
+        $freelancerId = 0;
+        $svcRaw = (string)($_POST['service_id'] ?? '');
+        $freeRaw = (string)($_POST['freelancer_id'] ?? '');
+        if ($svcRaw !== '') {
+            $tmp = filter_var($svcRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($tmp !== false) { $svcId = (int)$tmp; }
+        }
+        if ($freeRaw !== '') {
+            $tmp = filter_var($freeRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($tmp !== false) { $freelancerId = (int)$tmp; }
+        }
         if ($viewerId <= 0 || $svcId <= 0 || $freelancerId <= 0 || $viewerId === $freelancerId) {
             header('Location: feed.php');
             exit;
@@ -160,7 +170,12 @@ if ($currentUser && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['start
     if (!csrf_validate()) { header('Location: feed.php'); exit; }
     try {
         $viewerId = (int)($_SESSION['user_id'] ?? 0);
-        $otherId  = (int)($_POST['other_user_id'] ?? 0);
+        $otherId  = 0;
+        $otherRaw = (string)($_POST['other_user_id'] ?? '');
+        if ($otherRaw !== '') {
+            $tmp = filter_var($otherRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($tmp !== false) { $otherId = (int)$tmp; }
+        }
         if ($viewerId <= 0 || $otherId <= 0 || $viewerId === $otherId) {
             header('Location: feed.php');
             exit;
@@ -622,7 +637,7 @@ $categories = array_merge(['All'], $categoryList);
                                  data-date="<?php echo htmlspecialchars($service['date']); ?>"
                                  data-user-name="<?php echo htmlspecialchars($service['user_name']); ?>"
                                  data-user-avatar="<?php echo htmlspecialchars($service['user_avatar']); ?>"
-                                 data-recent-reviews='<?= htmlspecialchars(json_encode($recentReviewsByService[(int)$service['id']] ?? [], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)); ?>'
+                                 data-recent-reviews='<?= htmlspecialchars(json_encode($recentReviewsByService[(int)$service['id']] ?? [], JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>'
                                  style="animation-delay: <?php echo $index * 0.05; ?>s;">
                                 
                                 <!-- Card Header -->
