@@ -18,12 +18,12 @@ try {
     // Validate input (strict digits only)
     $convId = filter_input(INPUT_POST, 'conversation_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     $body = isset($_POST['body']) ? trim((string)$_POST['body']) : '';
-    if (($convId === false || $convId === null) && empty($_FILES['image']) && empty($_FILES['images'])) {
+    // conversation_id is always required (even for image-only messages)
+    if ($convId === false || $convId === null) {
         http_response_code(400);
         echo json_encode(['ok'=>false,'error'=>'invalid_conversation_id']);
         exit;
     }
-    $convId = $convId ?? 0;
 
     // Verify the user is a participant in the conversation
     $pdo = $db->opencon();
@@ -41,6 +41,12 @@ try {
     $type = 'text';
 
     $allowed = ['image/jpeg','image/png','image/webp','image/gif'];
+    $mimeToExt = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/webp' => 'webp',
+        'image/gif'  => 'gif',
+    ];
     $maxSize = 10 * 1024 * 1024; // 10MB
 
     // Helper to ensure folder exists
@@ -85,7 +91,6 @@ try {
 
     foreach ($files as $f) {
         $tmp = $f['tmp_name'];
-        $name = $f['name'];
         $size = (int)$f['size'];
         if ($size > $maxSize) {
             http_response_code(400);
@@ -98,8 +103,9 @@ try {
             echo json_encode(['ok'=>false,'error'=>'unsupported_type']);
             exit;
         }
-        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION) ?: 'jpg');
-        $basename = 'msg_' . uniqid('', true) . '.' . $ext;
+        // Never trust the uploaded filename/extension. Derive extension from validated MIME.
+        $ext = $mimeToExt[$mime] ?? 'jpg';
+        $basename = 'msg_' . bin2hex(random_bytes(16)) . '.' . $ext;
         $destFs = $msgDirPath . DIRECTORY_SEPARATOR . $basename;
         if (!move_uploaded_file($tmp, $destFs)) {
             http_response_code(500);
