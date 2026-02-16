@@ -15,10 +15,10 @@ try {
     $uid = (int)$_SESSION['user_id'];
     $db = new database();
 
-    $convId = isset($_POST['conversation_id']) ? (int)$_POST['conversation_id'] : 0;
-    if ($convId <= 0) {
+    $convId = filter_input(INPUT_POST, 'conversation_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if ($convId === false || $convId === null) {
         http_response_code(400);
-        echo json_encode(['ok'=>false,'error'=>'missing_parameters']);
+        echo json_encode(['ok'=>false,'error'=>'invalid_conversation_id']);
         exit;
     }
 

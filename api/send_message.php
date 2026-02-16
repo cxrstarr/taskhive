@@ -15,14 +15,15 @@ try {
     $uid = (int)$_SESSION['user_id'];
     $db = new database();
 
-    // Validate input
-    $convId = isset($_POST['conversation_id']) ? (int)$_POST['conversation_id'] : 0;
+    // Validate input (strict digits only)
+    $convId = filter_input(INPUT_POST, 'conversation_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     $body = isset($_POST['body']) ? trim((string)$_POST['body']) : '';
-    if ($convId <= 0 && empty($_FILES['image']) && empty($_FILES['images'])) {
+    if (($convId === false || $convId === null) && empty($_FILES['image']) && empty($_FILES['images'])) {
         http_response_code(400);
-        echo json_encode(['ok'=>false,'error'=>'missing_parameters']);
+        echo json_encode(['ok'=>false,'error'=>'invalid_conversation_id']);
         exit;
     }
+    $convId = $convId ?? 0;
 
     // Verify the user is a participant in the conversation
     $pdo = $db->opencon();

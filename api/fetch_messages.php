@@ -15,13 +15,21 @@ try {
     $uid = (int)$_SESSION['user_id'];
     $db = new database();
 
-    $convId = isset($_GET['conversation_id']) ? (int)$_GET['conversation_id'] : 0;
-    $afterId = isset($_GET['after_id']) ? (int)$_GET['after_id'] : 0;
-    if ($convId <= 0) {
+    // Strict allow-list validation: only digits allowed
+    $convId = filter_input(INPUT_GET, 'conversation_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $afterId = filter_input(INPUT_GET, 'after_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+    if ($convId === false || $convId === null) {
         http_response_code(400);
-        echo json_encode(['ok'=>false,'error'=>'missing_parameters']);
+        echo json_encode(['ok'=>false,'error'=>'invalid_conversation_id']);
         exit;
     }
+    if ($afterId === false) { // null means not provided; false means invalid
+        http_response_code(400);
+        echo json_encode(['ok'=>false,'error'=>'invalid_after_id']);
+        exit;
+    }
+    $afterId = $afterId ?? 0;
 
     // Verify participant
     $pdo = $db->opencon();
