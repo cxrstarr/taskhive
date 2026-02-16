@@ -1,10 +1,11 @@
 # Global security headers for TaskHive
 <IfModule mod_php.c>
-  php_value auto_prepend_file "c:/xampp/htdocs/taskhive/includes/csp.php"
+  # Use a relative path so this works outside local Windows/XAMPP too.
+  php_value auto_prepend_file "includes/csp.php"
 </IfModule>
 <IfModule mod_headers.c>
   <FilesMatch "\.(txt|css|js|png|jpg|jpeg|webp|svg|gif|ico|xml|webmanifest)$">
-    Header set Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; upgrade-insecure-requests; block-all-mixed-content; img-src 'self' data: blob: https://api.dicebear.com; script-src 'self' https://cdn.jsdelivr.net https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; connect-src 'self'; frame-src 'self'; worker-src 'none'; media-src 'self'; manifest-src 'self'"
+    Header set Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; upgrade-insecure-requests; block-all-mixed-content; img-src 'self' data: blob: https://api.dicebear.com; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; connect-src 'self'; frame-src 'self'; worker-src 'none'; media-src 'self'; manifest-src 'self'"
     Header set X-Frame-Options "SAMEORIGIN"
   </FilesMatch>
 </IfModule>

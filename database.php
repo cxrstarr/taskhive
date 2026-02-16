@@ -1,4 +1,7 @@
 <?php
+// Ensure CSP/security headers are emitted early on most requests.
+// (Some hosting setups ignore .htaccess auto_prepend_file; this makes CSP consistent.)
+require_once __DIR__ . '/includes/csp.php';
 /**
  * TaskHive unified data layer (PDO) with:
  *  - Users / Profiles

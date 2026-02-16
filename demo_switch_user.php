@@ -51,7 +51,7 @@ $users = $st->fetchAll(PDO::FETCH_ASSOC);
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Demo: Switch User - TaskHive</title>
   <link rel="icon" type="image/png" href="img/bee.jpg">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/tailwind.min.css">
 </head>
 <body class="bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 min-h-screen">
   <div class="max-w-6xl mx-auto px-4 py-8">

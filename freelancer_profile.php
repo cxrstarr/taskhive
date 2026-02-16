@@ -438,7 +438,7 @@ if ($viewerId) {
     <title>Task Hive - <?php echo htmlspecialchars($freelancer['name']); ?> Profile</title>
     
     <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/tailwind.min.css">
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>

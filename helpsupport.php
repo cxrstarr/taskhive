@@ -38,10 +38,10 @@ $notifications = [];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Help & Support - Task Hive</title>
     
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/tailwind.min.css">
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <style>
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         @keyframes slideDown {
             from { opacity: 0; transform: translateY(-10px) scale(0.95); }
             to { opacity: 1; transform: translateY(0) scale(1); }

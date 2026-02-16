@@ -1,6 +1,8 @@
 <?php
 // Start session
 session_start();
+require_once __DIR__ . '/includes/csp.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // If user is already logged in, redirect to home page
 if (isset($_SESSION['user_id'])) {
@@ -33,7 +35,6 @@ if (isset($_REQUEST['impersonate'])) {
 }
 
 // Handle form submission
-require_once __DIR__ . '/includes/csrf.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_validate()) {
         $_SESSION['login_errors'] = ['Security check failed. Please retry.'];

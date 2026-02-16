@@ -1,11 +1,14 @@
+<?php
+require_once __DIR__ . '/includes/csp.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Under Construction - Task Hive</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/tailwind.min.css">
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         @keyframes float {
             0%, 100% { 
                 transform: translateY(0px) rotate(0deg); 

@@ -1,6 +1,7 @@
 <?php
 // Boot session and fetch current user (if any)
 if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/includes/csp.php';
 require_once __DIR__ . '/database.php';
 $db = new database();
 
@@ -106,13 +107,13 @@ if (!empty($_SESSION['user_id'])) {
     <title>Task Hive - Find Your Buzz</title>
     <link rel="icon" type="image/png" href="img/bee.jpg">
     
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>                                                                                                                                                                                                                                                                                                   
+    <!-- Tailwind CSS (static stylesheet; avoids script-injected <style> tags so CSP can stay strict) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/tailwind.min.css">
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <style>
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         @keyframes float {
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-20px); }
@@ -230,7 +231,7 @@ if (!empty($_SESSION['user_id'])) {
                     <?php if ($currentUser): ?>
                         <!-- Notifications -->
                         <div class="relative">
-                            <button onclick="toggleNotifications()" class="relative p-2 hover:bg-amber-100 rounded-full transition-colors hover:scale-105" title="Notifications">
+                            <button id="btn-notifications" type="button" class="relative p-2 hover:bg-amber-100 rounded-full transition-colors hover:scale-105" title="Notifications">
                                 <i data-lucide="bell" class="w-5 h-5 text-gray-700"></i>
                                 <span class="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
                             </button>
@@ -238,7 +239,7 @@ if (!empty($_SESSION['user_id'])) {
                             <div id="notifications-dropdown" class="dropdown absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-amber-200 overflow-hidden">
                                 <div class="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-b border-amber-200 flex items-center justify-between">
                                     <h3 class="font-bold text-gray-900">Notifications</h3>
-                                    <button onclick="markAllAsRead()" class="text-xs text-amber-600 hover:text-amber-700 font-medium">Mark all as read</button>
+                                    <button id="btn-mark-all-read" type="button" class="text-xs text-amber-600 hover:text-amber-700 font-medium">Mark all as read</button>
                                 </div>
                                 <div class="max-h-96 overflow-y-auto">
                                     <?php foreach ($notifications as $notif): ?>
@@ -1034,9 +1035,19 @@ if (!empty($_SESSION['user_id'])) {
                 const dot = item.querySelector('.bg-blue-500');
                 if (dot) dot.remove();
             });
-            const badge = document.querySelector('button[title="Notifications"] .absolute.top-1.right-1');
+            const badge = document.querySelector('#btn-notifications .absolute.top-1.right-1');
             if (badge) badge.remove();
         }
+
+        // Bind notification buttons (avoid inline handlers for CSP)
+        document.getElementById('btn-notifications')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleNotifications();
+        });
+        document.getElementById('btn-mark-all-read')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            markAllAsRead();
+        });
 
         // Profile dropdown (if present)
         const profileBtn = document.getElementById('profile-btn');
@@ -1060,7 +1071,7 @@ if (!empty($_SESSION['user_id'])) {
             document.addEventListener('click', (e) => {
                 // Close notifications when clicking outside
                 const notifDd = document.getElementById('notifications-dropdown');
-                if (notifDd && notifDd.classList.contains('active') && !e.target.closest('#notifications-dropdown') && !e.target.closest('button[title="Notifications"]')) {
+                if (notifDd && notifDd.classList.contains('active') && !e.target.closest('#notifications-dropdown') && !e.target.closest('#btn-notifications')) {
                     notifDd.classList.remove('active');
                 }
                 if (!profileDropdown.classList.contains('hidden')) {

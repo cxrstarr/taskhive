@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/includes/csp.php';
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/includes/csrf.php';
 
@@ -266,7 +267,8 @@ $categories = array_merge(['All'], $categoryList);
     <title>Task Hive - Service Feed</title>
     
     <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (static stylesheet; avoids script-injected <style> tags so CSP can stay strict) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/tailwind.min.css">
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -403,7 +405,7 @@ $categories = array_merge(['All'], $categoryList);
             <div class="flex items-center justify-between h-16">
                 <!-- Left Section -->
                 <div class="flex items-center gap-4">
-                    <button onclick="toggleSidebar()" class="p-2 hover:bg-amber-100 rounded-lg transition-colors">
+                    <button id="btn-sidebar" type="button" class="p-2 hover:bg-amber-100 rounded-lg transition-colors">
                         <i data-lucide="menu" class="w-5 h-5 text-gray-700"></i>
                     </button>
 
@@ -426,7 +428,7 @@ $categories = array_merge(['All'], $categoryList);
                 <div class="flex items-center gap-3">
                     <!-- Notifications -->
                     <div class="relative">
-                        <button onclick="toggleNotifications()" class="relative p-2 hover:bg-amber-100 rounded-full transition-colors hover:scale-105" title="Notifications">
+                        <button id="btn-notifications" type="button" class="relative p-2 hover:bg-amber-100 rounded-full transition-colors hover:scale-105" title="Notifications">
                             <i data-lucide="bell" class="w-5 h-5 text-gray-700"></i>
                             <span class="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
                         </button>
@@ -434,7 +436,7 @@ $categories = array_merge(['All'], $categoryList);
                         <div id="notifications-dropdown" class="dropdown absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-amber-200 overflow-hidden">
                             <div class="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-b border-amber-200 flex items-center justify-between">
                                 <h3 class="font-bold text-gray-900">Notifications</h3>
-                                <button onclick="markAllAsRead()" class="text-xs text-amber-600 hover:text-amber-700 font-medium">Mark all as read</button>
+                                <button id="btn-mark-all-read" type="button" class="text-xs text-amber-600 hover:text-amber-700 font-medium">Mark all as read</button>
                             </div>
                             <div class="max-h-96 overflow-y-auto">
                                 <?php foreach ($notifications as $notif): ?>
@@ -459,7 +461,7 @@ $categories = array_merge(['All'], $categoryList);
 
                     <!-- Profile Dropdown -->
                     <div class="relative">
-                        <button onclick="toggleProfileDropdown()" class="flex items-center gap-3 px-3 py-2 hover:bg-amber-50 rounded-full transition-colors">
+                        <button id="btn-profile-dropdown" type="button" class="flex items-center gap-3 px-3 py-2 hover:bg-amber-50 rounded-full transition-colors">
                             <img src="<?php echo htmlspecialchars($currentUser['avatar']); ?>" 
                                  alt="<?php echo htmlspecialchars($currentUser['name']); ?>" 
                                  class="w-8 h-8 rounded-full border-2 border-amber-400 object-cover">
@@ -594,8 +596,8 @@ $categories = array_merge(['All'], $categoryList);
                                 placeholder="Search services (title or description)..."
                                 value="<?php echo htmlspecialchars($search); ?>"
                                 class="w-full pl-12 pr-12 h-12 bg-white border border-amber-200 rounded-lg text-base focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all"
-                                oninput="filterServices()">
-                            <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                                >
+                            <button id="clear-search" type="button" class="hidden absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
                                 ✕
                             </button>
                         </div>
@@ -604,7 +606,7 @@ $categories = array_merge(['All'], $categoryList);
                         <div class="flex items-center gap-2 overflow-x-auto pb-2 hide-scrollbar">
                             <?php foreach ($categories as $category): ?>
                                 <button 
-                                    onclick="setCategory('<?php echo htmlspecialchars($category); ?>')" 
+                                    type="button"
                                     class="category-pill <?php echo $category === 'All' ? 'active' : ''; ?> px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium <?php echo $category === 'All' ? '' : 'bg-white text-gray-700 border border-amber-200 hover:border-amber-400'; ?>"
                                     data-category="<?php echo htmlspecialchars($category); ?>">
                                     <?php echo htmlspecialchars($category); ?>
@@ -902,7 +904,7 @@ $categories = array_merge(['All'], $categoryList);
                 const dot = item.querySelector('.bg-blue-500');
                 if (dot) dot.remove();
             });
-            const badge = document.querySelector('button[title="Notifications"] .absolute.top-1.right-1');
+            const badge = document.querySelector('#btn-notifications .absolute.top-1.right-1') || document.querySelector('button[title="Notifications"] .absolute.top-1.right-1');
             if (badge) badge.remove();
         }
 
@@ -919,17 +921,46 @@ $categories = array_merge(['All'], $categoryList);
             }
         }
 
-        // Close dropdown when clicking outside
+        // Close dropdowns when clicking outside
         document.addEventListener('click', function(event) {
+            const profileBtn = document.getElementById('btn-profile-dropdown');
+            const notifBtn = document.getElementById('btn-notifications');
             const profileDd = document.getElementById('profile-dropdown');
             const notifDd = document.getElementById('notifications-dropdown');
-            const clickedButton = event.target.closest('button');
-            if (!clickedButton || (!clickedButton.onclick && !clickedButton.getAttribute('onclick'))) {
-                if (profileDd) profileDd.classList.remove('active');
-                if (notifDd) notifDd.classList.remove('active');
-                const arr = document.getElementById('dropdown-arrow');
-                if (arr) arr.style.transform = 'rotate(0deg)';
+
+            if (profileDd && profileDd.classList.contains('active')) {
+                const insideProfile = profileDd.contains(event.target) || (profileBtn && profileBtn.contains(event.target));
+                if (!insideProfile) {
+                    profileDd.classList.remove('active');
+                    const arr = document.getElementById('dropdown-arrow');
+                    if (arr) arr.style.transform = 'rotate(0deg)';
+                }
             }
+            if (notifDd && notifDd.classList.contains('active')) {
+                const insideNotif = notifDd.contains(event.target) || (notifBtn && notifBtn.contains(event.target));
+                if (!insideNotif) {
+                    notifDd.classList.remove('active');
+                }
+            }
+        });
+
+        // Wire UI events (avoid inline handlers so CSP doesn't need unsafe-inline)
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('btn-sidebar')?.addEventListener('click', toggleSidebar);
+            document.getElementById('btn-notifications')?.addEventListener('click', function(e){ e.preventDefault(); toggleNotifications(); });
+            document.getElementById('btn-mark-all-read')?.addEventListener('click', function(e){ e.preventDefault(); markAllAsRead(); });
+            document.getElementById('btn-profile-dropdown')?.addEventListener('click', function(e){ e.preventDefault(); toggleProfileDropdown(); });
+
+            const searchInput = document.getElementById('search-input');
+            searchInput?.addEventListener('input', filterServices);
+            document.getElementById('clear-search')?.addEventListener('click', function(e){ e.preventDefault(); clearSearch(); });
+
+            document.querySelectorAll('.category-pill').forEach((pill) => {
+                pill.addEventListener('click', function(){
+                    const cat = pill.dataset.category || 'All';
+                    setCategory(cat);
+                });
+            });
         });
 
     // Sidebar active state + section switcher

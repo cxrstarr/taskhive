@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Leave a Review</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/tailwind.min.css">
 </head>
 <body class="bg-gradient-to-br from-gray-50 to-amber-50">
   <div class="max-w-xl mx-auto mt-10 bg-white border border-amber-200 rounded-2xl shadow p-6">

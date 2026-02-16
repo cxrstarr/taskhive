@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/includes/csp.php';
 require_once 'database.php';
 require_once __DIR__ . '/includes/csrf.php';
 require_once 'flash.php';
@@ -294,9 +295,7 @@ $reviews_written = array_map(function($r){
                     </div>
                     <h1>BeeHive Client Dashboard</h1>
                 </div>
-                <button class="btn-outline" onclick="window.location.href='feed.php'">
-                    Back to Feed
-                </button>
+                <a class="btn-outline" href="feed.php">Back to Feed</a>
             </div>
         </header>
 
@@ -323,7 +322,7 @@ $reviews_written = array_map(function($r){
                         </div>
                         <div class="edit-only" style="margin-top:8px;">
                             <label style="font-size:12px; color:#666; display:block; margin-bottom:6px;">Change profile picture</label>
-                            <input type="file" name="profile_picture" accept="image/*" class="profile-edit-input" disabled onchange="previewProfileImage(event)">
+                            <input type="file" name="profile_picture" accept="image/*" class="profile-edit-input" disabled>
                             <small style="color:#888;">Accepted: JPG, PNG, WEBP. Max 2MB.</small>
                         </div>
                     </div>
@@ -341,7 +340,7 @@ $reviews_written = array_map(function($r){
                     </div>
 
                     <div class="profile-actions">
-                        <button type="button" class="btn-primary view-only" onclick="toggleEditProfile(true)">
+                        <button type="button" class="btn-primary view-only" id="btn-edit-profile">
                             <i class="fas fa-edit"></i>
                             Edit Profile
                         </button>
@@ -350,14 +349,11 @@ $reviews_written = array_map(function($r){
                                 <i class="fas fa-save"></i>
                                 Save
                             </button>
-                            <button type="button" class="btn-outline-secondary" onclick="toggleEditProfile(false)">
+                            <button type="button" class="btn-outline-secondary" id="btn-cancel-profile">
                                 Cancel
                             </button>
                         </div>
-                        <button type="button" class="btn-outline-secondary" onclick="window.location.href='logout.php'">
-                            <i class="fas fa-sign-out-alt"></i>
-                            Logout
-                        </button>
+                        <a class="btn-outline-secondary" href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
                 </form>
             </aside>
@@ -403,10 +399,7 @@ $reviews_written = array_map(function($r){
                 <section class="content-card">
                     <div class="section-header">
                         <h3>Your Bookings</h3>
-                        <button class="btn-primary" onclick="window.location.href='feed.php'">
-                            <i class="fas fa-plus"></i>
-                            Book a Service
-                        </button>
+                        <a class="btn-primary" href="feed.php"><i class="fas fa-plus"></i> Book a Service</a>
                     </div>
 
                     <div class="bookings-table-wrapper">
@@ -436,7 +429,7 @@ $reviews_written = array_map(function($r){
                                     <img src="<?php echo htmlspecialchars($booking['freelancer_avatar']); ?>" 
                                         alt="<?php echo htmlspecialchars($booking['freelancer_name']); ?>" 
                                         class="freelancer-avatar-sm"
-                                        onerror="this.onerror=null;this.src='img/profile_icon.webp';">
+                                        data-fallback-src="img/profile_icon.webp">
                                             <span><?php echo htmlspecialchars($booking['freelancer_name']); ?></span>
                                         </div>
                                     </td>
@@ -459,7 +452,8 @@ $reviews_written = array_map(function($r){
                                         <?php elseif (in_array($booking['raw_status'], ['delivered','completed'])): ?>
                                             <button
                                                 class="btn-sm btn-warning"
-                                                onclick="openReviewModalFromButton(this)"
+                                                type="button"
+                                                data-open-review="1"
                                                 data-booking-id="<?php echo (int)$booking['id']; ?>"
                                                 data-service-name="<?php echo htmlspecialchars($booking['service_name'], ENT_QUOTES, 'UTF-8'); ?>"
                                                 data-freelancer-name="<?php echo htmlspecialchars($booking['freelancer_name'], ENT_QUOTES, 'UTF-8'); ?>"
@@ -510,7 +504,7 @@ $reviews_written = array_map(function($r){
                           <img src="<?php echo htmlspecialchars($review['freelancer_avatar']); ?>" 
                               alt="<?php echo htmlspecialchars($review['freelancer_name']); ?>" 
                               class="review-avatar"
-                              onerror="this.onerror=null;this.src='img/profile_icon.webp';">
+                              data-fallback-src="img/profile_icon.webp">
                                 
                                 <div class="review-content">
                                     <div class="review-header">
@@ -564,7 +558,7 @@ $reviews_written = array_map(function($r){
                     <h3 style="margin:0;">Write a Review</h3>
                     <p class="modal-subtitle">Share your experience with this service</p>
                 </div>
-                <button class="modal-close" onclick="closeReviewIframeModal()" title="Close">
+                <button class="modal-close" type="button" id="btn-close-review-modal" title="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -656,6 +650,27 @@ $reviews_written = array_map(function($r){
         const url = URL.createObjectURL(file);
         img.src = url;
     }
+
+    // Bind UI events without inline handlers (keeps CSP free of unsafe-inline)
+    document.addEventListener('DOMContentLoaded', function(){
+        document.getElementById('btn-edit-profile')?.addEventListener('click', function(){ toggleEditProfile(true); });
+        document.getElementById('btn-cancel-profile')?.addEventListener('click', function(){ toggleEditProfile(false); });
+        document.getElementById('btn-close-review-modal')?.addEventListener('click', function(){ closeReviewIframeModal(); });
+
+        document.querySelectorAll('[data-open-review="1"]').forEach((btn) => {
+            btn.addEventListener('click', function(){ openReviewModalFromButton(btn); });
+        });
+
+        const fileInput = document.querySelector('#profileCard input[name="profile_picture"]');
+        fileInput?.addEventListener('change', previewProfileImage);
+
+        document.querySelectorAll('img[data-fallback-src]').forEach((img) => {
+            img.addEventListener('error', function(){
+                const fb = img.getAttribute('data-fallback-src');
+                if (fb && img.getAttribute('src') !== fb) img.setAttribute('src', fb);
+            });
+        });
+    });
     </script>
     <?php if (function_exists('flash_render')) echo flash_render(); ?>
 </body>
