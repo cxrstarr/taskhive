@@ -676,6 +676,7 @@ try {
                                     <i data-lucide="archive" class="w-4 h-4 text-gray-600"></i>
                                 </button>
                                 <form id="delete-conv-form" method="POST" action="conversation_delete.php" class="inline">
+                                    <?php echo csrf_input(); ?>
                                     <input type="hidden" name="conversation_id" id="delete-conv-id" value="<?php echo $hasConv ? (int)$firstConvId : 0; ?>">
                                     <input type="hidden" name="return" value="inbox.php">
                                     <button type="submit" class="p-2 hover:bg-red-100 rounded-lg transition-colors" onclick="return confirm('Delete this conversation from your inbox? This won\'t affect the other user.')">
@@ -758,6 +759,7 @@ try {
                             </div>
                         </div>
                         <form id="client-payment-form" action="payment_actions.php" method="POST" class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <?php echo csrf_input(); ?>
                             <input type="hidden" name="task" value="make_payment">
                             <input type="hidden" name="conversation_id" id="cpf-conv-id" value="">
                             <input type="hidden" name="booking_id" id="cpf-booking-id" value="">

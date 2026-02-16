@@ -9,7 +9,13 @@ session_start();
 // }
 
 // Handle form submission
+require_once __DIR__ . '/includes/csrf.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_validate()) {
+        $_SESSION['registration_errors'] = ['Security check failed. Please retry.'];
+        header('Location: client_register.php');
+        exit();
+    }
     require_once 'database.php';
     $db = new database();
     $pdo = $db->opencon();
@@ -655,6 +661,7 @@ unset($_SESSION['registration_errors']);
             <?php endif; ?>
 
             <form id="clientRegForm" method="POST" action="">
+                <?php echo csrf_input(); ?>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="firstName">First Name</label>

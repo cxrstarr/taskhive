@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 $db = new database();
 $currentUser = null;
@@ -79,6 +80,7 @@ if (!$currentUser) {
 
 // If client clicks "Book Now" from the feed modal, create booking immediately and redirect to inbox
 if ($currentUser && ($currentUser['user_type'] ?? '') === 'client' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_service_from_feed'])) {
+    if (!csrf_validate()) { header('Location: feed.php'); exit; }
     try {
         $viewerId = (int)($_SESSION['user_id'] ?? 0);
         $svcId = (int)($_POST['service_id'] ?? 0);
@@ -155,6 +157,7 @@ if ($currentUser && ($currentUser['user_type'] ?? '') === 'client' && $_SERVER['
 
 // If user clicks "Message" from the feed, reuse existing conversation or create the general one, then redirect
 if ($currentUser && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['start_chat_from_feed'])) {
+    if (!csrf_validate()) { header('Location: feed.php'); exit; }
     try {
         $viewerId = (int)($_SESSION['user_id'] ?? 0);
         $otherId  = (int)($_POST['other_user_id'] ?? 0);
@@ -723,6 +726,7 @@ $categories = array_merge(['All'], $categoryList);
                                         </button>
                                         <?php if (!empty($currentUser) && (int)($currentUser['id'] ?? 0) !== (int)$service['owner_id']): ?>
                                         <form method="POST" action="feed.php" class="flex-1">
+                                            <?php echo csrf_input(); ?>
                                             <input type="hidden" name="start_chat_from_feed" value="1">
                                             <input type="hidden" name="other_user_id" value="<?php echo (int)$service['owner_id']; ?>">
                                             <button type="submit" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 shadow-md hover:shadow-lg transition-all group">
@@ -838,6 +842,7 @@ $categories = array_merge(['All'], $categoryList);
 
     <!-- Hidden form to submit immediate booking from the feed -->
     <form id="book-from-feed-form" method="post" class="hidden">
+        <?php echo csrf_input(); ?>
         <input type="hidden" name="book_service_from_feed" value="1" />
         <input type="hidden" name="service_id" id="bfff-service-id" value="" />
         <input type="hidden" name="freelancer_id" id="bfff-freelancer-id" value="" />

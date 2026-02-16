@@ -9,7 +9,13 @@ session_start();
 // }
 
 // Handle form submission
+require_once __DIR__ . '/includes/csrf.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_validate()) {
+        $_SESSION['registration_errors'] = ['Security check failed. Please retry.'];
+        header('Location: freelancer_register.php');
+        exit();
+    }
     require_once 'database.php';
     $db = new database();
     $pdo = $db->opencon();
@@ -931,6 +937,7 @@ unset($_SESSION['registration_errors']);
                 <?php endif; ?>
 
                 <form id="registrationForm" method="POST" action="">
+                    <?php echo csrf_input(); ?>
                     <!-- Step 1: Basic Info -->
                     <div class="step-content" id="step1">
                         <div class="step-header">

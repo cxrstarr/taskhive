@@ -2,10 +2,17 @@
 session_start();
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Supports both form POST and AJAX fetch
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: index.php');
+    exit;
+}
+
+if (!csrf_validate()) {
+    flash_set('error','Security check failed. Please try again.');
+    header('Location: '.(isset($_POST['return']) ? (string)$_POST['return'] : 'inbox.php'));
     exit;
 }
 

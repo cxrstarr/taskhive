@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__.'/database.php';
 require_once __DIR__.'/flash.php';
+require_once __DIR__.'/includes/csrf.php';
 
 // Detect if client expects JSON (XHR/fetch)
 $accept = isset($_SERVER['HTTP_ACCEPT']) ? (string)$_SERVER['HTTP_ACCEPT'] : '';
@@ -27,6 +28,19 @@ if (empty($_SESSION['user_id'])) {
     }
     flash_set('error','Please log in to continue.');
     header('Location: login.php');
+    exit;
+}
+
+// CSRF validation
+if (!csrf_validate()) {
+    if ($wantsJson) {
+        header('Content-Type: application/json');
+        http_response_code(403);
+        echo json_encode(['ok'=>false,'error'=>'csrf_failed']);
+        exit;
+    }
+    flash_set('error','Security check failed. Please try again.');
+    header('Location: inbox.php');
     exit;
 }
 

@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -16,6 +17,11 @@ $pdo = $db->opencon();
 $task = $_POST['task'] ?? '';
 
 if ($task === 'make_payment') {
+    if (!csrf_validate()) {
+        flash_set('error','Security check failed. Please retry.');
+        header('Location: '.($_POST['return'] ?? 'inbox.php'));
+        exit;
+    }
     $conversation_id   = (int)($_POST['conversation_id'] ?? 0);
     $booking_id        = (int)($_POST['booking_id'] ?? 0);
     $phase             = $_POST['phase'] ?? '';

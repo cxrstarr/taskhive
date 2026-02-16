@@ -33,7 +33,13 @@ if (isset($_REQUEST['impersonate'])) {
 }
 
 // Handle form submission
+require_once __DIR__ . '/includes/csrf.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_validate()) {
+        $_SESSION['login_errors'] = ['Security check failed. Please retry.'];
+        header('Location: login.php');
+        exit();
+    }
     require_once 'database.php';
     $db = new database();
 
@@ -589,6 +595,7 @@ unset($_SESSION['login_errors']);
 
             <!-- Form -->
             <form id="loginForm" class="login-form" method="POST" action="">
+                <?php echo csrf_input(); ?>
                 <!-- Email -->
                 <div class="form-group">
                     <label for="email">Email</label>
