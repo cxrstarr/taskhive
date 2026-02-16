@@ -19,7 +19,11 @@ if (!csrf_validate()) {
 }
 $service_id = (int)($_POST['service_id'] ?? 0);
 $action = $_POST['action'] ?? '';
-$reason = trim($_POST['reason'] ?? '');
+// Sanitize reason to avoid path-like inputs and control chars; cap length
+$reason = trim((string)($_POST['reason'] ?? ''));
+$reason = preg_replace('/[\\\/]/', '', $reason); // remove directory separators
+$reason = preg_replace('/[\x00-\x1F\x7F]/', '', $reason); // strip control chars
+$reason = mb_substr($reason, 0, 500);
 $service_ids = isset($_POST['service_ids']) && is_array($_POST['service_ids']) ? array_values(array_unique(array_map('intval', $_POST['service_ids']))) : [];
 // Rejects should send the service back to draft (no delete in this flow)
 
@@ -27,7 +31,18 @@ $service_ids = isset($_POST['service_ids']) && is_array($_POST['service_ids']) ?
 $allowed = ['approve','reject','archive','delete','flag','unflag','bulk_approve','bulk_reject'];
 if ((!$service_id && empty($service_ids)) || !in_array($action, $allowed, true)) {
   flash_set('error', 'Invalid request.');
-  header('Location: ' . (!empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'admin_dashboard.php?view=services'));
+  // Safe redirect to same-origin path
+  $ref = (string)($_SERVER['HTTP_REFERER'] ?? '');
+  $target = 'admin_dashboard.php?view=services';
+  if ($ref !== '') {
+    $parts = @parse_url($ref);
+    if ($parts && (!isset($parts['host']) || strcasecmp($parts['host'], (string)($_SERVER['HTTP_HOST'] ?? '')) === 0)) {
+      $path = $parts['path'] ?? '';
+      $query = isset($parts['query']) ? ('?' . $parts['query']) : '';
+      if ($path !== '' && !preg_match('/^\/{2}/', $path)) { $target = $path . $query; }
+    }
+  }
+  header('Location: ' . $target);
   exit;
 }
 
@@ -93,8 +108,18 @@ try {
       $pdo->commit();
       flash_set('success', 'Selected services rejected to draft.');
     }
-    $back = !empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'admin_dashboard.php?view=service_queue';
-    header("Location: $back");
+    // Safe redirect back
+    $ref = (string)($_SERVER['HTTP_REFERER'] ?? '');
+    $target = 'admin_dashboard.php?view=service_queue';
+    if ($ref !== '') {
+      $parts = @parse_url($ref);
+      if ($parts && (!isset($parts['host']) || strcasecmp($parts['host'], (string)($_SERVER['HTTP_HOST'] ?? '')) === 0)) {
+        $path = $parts['path'] ?? '';
+        $query = isset($parts['query']) ? ('?' . $parts['query']) : '';
+        if ($path !== '' && !preg_match('/^\/{2}/', $path)) { $target = $path . $query; }
+      }
+    }
+    header('Location: ' . $target);
     exit;
   }
 
@@ -177,5 +202,15 @@ try {
   flash_set('error', 'Action failed: '.$e->getMessage());
 }
 
-$back = !empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'admin_dashboard.php?view=services';
-header("Location: $back");
+// Final safe redirect
+$ref = (string)($_SERVER['HTTP_REFERER'] ?? '');
+$target = 'admin_dashboard.php?view=services';
+if ($ref !== '') {
+  $parts = @parse_url($ref);
+  if ($parts && (!isset($parts['host']) || strcasecmp($parts['host'], (string)($_SERVER['HTTP_HOST'] ?? '')) === 0)) {
+    $path = $parts['path'] ?? '';
+    $query = isset($parts['query']) ? ('?' . $parts['query']) : '';
+    if ($path !== '' && !preg_match('/^\/{2}/', $path)) { $target = $path . $query; }
+  }
+}
+header('Location: ' . $target);

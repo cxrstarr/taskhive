@@ -134,8 +134,17 @@ foreach ($rows as $r) {
 $unreadCount = $db->countUnreadMessages($uid);
 
 // Determine which conversation to open initially
-$requestedConvId = isset($_GET['conversation_id']) ? (int)$_GET['conversation_id'] : 0;
-$requestedUserId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
+$requestedConvId = 0;
+$requestedUserId = 0;
+// Strictly validate numeric GET params to avoid expressions like "53-2"
+if (isset($_GET['conversation_id'])) {
+    $tmp = filter_var($_GET['conversation_id'], FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ]);
+    if ($tmp !== false) { $requestedConvId = (int)$tmp; }
+}
+if (isset($_GET['user_id'])) {
+    $tmp = filter_var($_GET['user_id'], FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ]);
+    if ($tmp !== false) { $requestedUserId = (int)$tmp; }
+}
 $activeConvId = 0;
 if ($requestedConvId && isset($conversations[$requestedConvId])) {
     $activeConvId = $requestedConvId;
