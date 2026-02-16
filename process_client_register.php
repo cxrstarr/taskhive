@@ -2,12 +2,14 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Only allow POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: client.php");
     exit;
 }
+if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: client.php'); exit; }
 
 $first = trim($_POST['first_name'] ?? '');
 $last  = trim($_POST['last_name'] ?? '');

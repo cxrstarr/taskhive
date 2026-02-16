@@ -2,6 +2,7 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 if (empty($_SESSION['user_id'])) { header('Location: admin_login.php'); exit; }
 $db = new database();
@@ -9,6 +10,11 @@ $admin = $db->getUser((int)$_SESSION['user_id']);
 if (!$admin || $admin['user_type'] !== 'admin') { echo 'Access denied.'; exit; }
 
 $pdo = $db->opencon();
+if (!csrf_validate()) {
+  flash_set('error','Security check failed.');
+  header('Location: ' . (!empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'admin_dashboard.php?view=service_queue'));
+  exit;
+}
 $action = $_POST['action'] ?? '';
 $reason_id = (int)($_POST['reason_id'] ?? 0);
 $label = trim($_POST['label'] ?? '');

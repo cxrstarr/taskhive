@@ -2,6 +2,7 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 /*
  * Processes a booking made by a logged-in CLIENT.
@@ -11,6 +12,7 @@ require_once 'flash.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: index.php"); exit;
 }
+if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: index.php'); exit; }
 
 if (empty($_SESSION['user_id']) || ($_SESSION['user_type'] ?? '') !== 'client') {
     flash_set('error','You must be logged in as a client to book.');

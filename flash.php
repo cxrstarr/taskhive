@@ -11,7 +11,8 @@ function flash_render(): string {
         foreach ($msgs as $m) {
             $escaped = htmlspecialchars($m, ENT_QUOTES, 'UTF-8');
             $icon = $type === 'success' ? 'success' : ($type==='error'?'error':'info');
-            $out .= "<script>Swal.fire({icon:'$icon', text: '$escaped'});</script>";
+            $nonceAttr = function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '';
+            $out .= "<script$nonceAttr>Swal.fire({icon:'$icon', text: '$escaped'});</script>";
         }
     }
     unset($_SESSION['flash']);

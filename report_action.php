@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__.'/database.php';
 require_once __DIR__.'/flash.php';
+require_once __DIR__.'/includes/csrf.php';
 
 /*
   report_action.php
@@ -26,6 +27,11 @@ require_once __DIR__.'/flash.php';
 if (empty($_SESSION['user_id'])) {
   flash_set('error','Login required.');
   header('Location: login.php'); exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_validate()) {
+  flash_set('error','Security check failed.');
+  header('Location: '.(isset($_POST['return']) ? (string)$_POST['return'] : 'index.php')); exit;
 }
 
 $allowedTypes = ['service','message','review','booking','user'];

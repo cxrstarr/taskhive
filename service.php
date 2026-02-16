@@ -45,7 +45,7 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <style>
+  <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
     .price-badge { font-size:0.9rem; }
     .avatar-sm { width:64px;height:64px;object-fit:cover; }
     .service-actions .btn { margin-right:4px; }
@@ -126,6 +126,7 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
           <?php endif; ?>
           <!-- Message (any user type) -->
           <form action="start_conversation.php" method="POST" class="d-inline">
+            <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
             <input type="hidden" name="target_user_id" value="<?= (int)$svc['freelancer_user_id']; ?>">
             <input type="hidden" name="service_id" value="<?= (int)$svc['service_id']; ?>">
             <button class="btn btn-outline-primary btn-sm" type="submit">Message</button>
@@ -144,6 +145,7 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
 <div class="modal fade" id="bookModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form class="modal-content" method="POST" action="book_service.php">
+      <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
       <div class="modal-header">
         <h5 class="modal-title">Book: <?= htmlspecialchars($svc['title']); ?></h5>
         <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
@@ -184,6 +186,7 @@ $isClient = $currentUser && $currentUser['user_type'] === 'client';
 <div class="modal fade" id="reportServiceModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form class="modal-content" method="POST" action="report_action.php">
+      <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
       <div class="modal-header">
         <h5 class="modal-title">Report Service</h5>
         <button class="btn-close" data-bs-dismiss="modal" type="button"></button>

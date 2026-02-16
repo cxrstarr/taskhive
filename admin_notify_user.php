@@ -2,11 +2,13 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 if (empty($_SESSION['user_id'])) { header('Location: admin_login.php'); exit; }
 $db = new database();
 $user = $db->getUser((int)$_SESSION['user_id']);
 if (!$user || $user['user_type'] !== 'admin') { echo "Access denied."; exit; }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: admin_dashboard.php?view=notify_user'); exit; }
   $toUser = (int)($_POST['user_id'] ?? 0);
   $text = trim((string)($_POST['text'] ?? ''));
   if ($toUser && $text !== '') {
@@ -42,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <?= flash_render(); ?>
   <h3>Send Notification to User</h3>
   <form method="POST">
+    <?= csrf_input(); ?>
     <input type="number" name="user_id" placeholder="User ID" class="form-control mb-2" required />
     <textarea name="text" class="form-control mb-2" placeholder="Message" required></textarea>
     <button class="btn btn-primary">Send</button>

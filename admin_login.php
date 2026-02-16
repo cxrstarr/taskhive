@@ -2,6 +2,7 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Fixed impersonation: admin is user ID 5
 if (isset($_REQUEST['impersonate'])) {
@@ -23,6 +24,11 @@ if (isset($_REQUEST['impersonate'])) {
 // Remove demo-role flow; using fixed IDs instead
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  if (!csrf_validate()) {
+    flash_set('error','Security check failed. Please retry.');
+    header('Location: admin_login.php');
+    exit;
+  }
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $db = new database();
@@ -57,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <a href="login.php?impersonate=2" class="btn btn-outline-warning">Login as Client (ID 2)</a>
         </div>
         <form method="POST">
+          <?= csrf_input(); ?>
           <div class="mb-3">
             <label class="form-label">Email</label>
             <input type="email" name="email" class="form-control" required autofocus>

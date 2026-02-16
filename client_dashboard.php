@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'database.php';
+require_once __DIR__ . '/includes/csrf.php';
 require_once 'flash.php';
 
 // Require logged-in client
@@ -23,6 +24,7 @@ $roff = ($rp - 1) * $reviewsPerPage;
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['profile_update'])) {
     $first = trim($_POST['first_name'] ?? '');
     $last  = trim($_POST['last_name'] ?? '');
+    if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: client_dashboard.php'); exit; }
     $phone = trim($_POST['phone'] ?? '');
     $bio   = trim($_POST['bio'] ?? '');
 
@@ -224,7 +226,7 @@ $reviews_written = array_map(function($r){
         <link rel="stylesheet" href="dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <style>
+        <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
             /* Minimal modal + rating styles to ensure the Review popup works */
             .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
             .modal.open { display: flex; }
@@ -313,6 +315,7 @@ $reviews_written = array_map(function($r){
                             <input type="text" name="first_name" class="profile-edit-input" placeholder="First name" value="<?php echo htmlspecialchars($cp['first_name'] ?? ''); ?>" disabled>
                             <input type="text" name="last_name" class="profile-edit-input" placeholder="Last name" value="<?php echo htmlspecialchars($cp['last_name'] ?? ''); ?>" disabled>
                         </div>
+                        <?= csrf_input(); ?>
                         
                         <div class="profile-email">
                             <i class="fas fa-envelope"></i>
@@ -569,7 +572,7 @@ $reviews_written = array_map(function($r){
         </div>
     </div>
 
-    <script>
+    <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
     // Expose a map for quick lookup (kept for potential future use)
     window.BOOKINGS_BY_ID = <?php echo json_encode(array_reduce($bookings, function($acc,$b){
         $acc[$b['id']] = [

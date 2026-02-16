@@ -29,6 +29,7 @@ $flaggedReviews = $db->opencon()->query("SELECT * FROM reviews WHERE flagged=1 O
       <li>
         <?= htmlspecialchars($r['rating']) ?>/5: <?= htmlspecialchars($r['comment']) ?>
         <form method="POST" action="admin_review_action.php" class="d-inline">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="review_id" value="<?= (int)$r['review_id'] ?>">
           <button class="btn btn-sm btn-danger" name="action" value="delete">Delete</button>
           <button class="btn btn-sm btn-success" name="action" value="approve">Keep</button>

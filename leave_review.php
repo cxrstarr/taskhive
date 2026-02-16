@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Helper: compute a safe redirect target within this site
 function taskhive_safe_redirect_target(?string $target): string {
@@ -45,6 +46,7 @@ if (!$booking) { header('Location: client_profile.php'); exit; }
 
 // Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  if (!csrf_validate()) { $error = 'Security check failed.'; }
     $rating = isset($_POST['rating']) ? (int)$_POST['rating'] : 0;
     $comment = trim((string)($_POST['comment'] ?? ''));
     if ($rating < 1 || $rating > 5) {
@@ -61,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ?><!DOCTYPE html>
         <html><head><meta charset="utf-8"><title>Review Submitted</title></head>
         <body style="font-family:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding:20px;">
-        <script>
+        <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
           try {
             if (window.opener) { window.opener.postMessage({ type: 'review_submitted', ok: true }, '*'); }
             if (window.parent && window.parent !== window) { window.parent.postMessage({ type: 'review_submitted', ok: true }, '*'); }
@@ -104,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="mb-4 p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
     <form method="post" id="review-form">
+      <?= csrf_input(); ?>
       <input type="hidden" name="redirect" value="<?php echo htmlspecialchars($redirectDefault, ENT_QUOTES); ?>">
       <?php if ($isModal): ?><input type="hidden" name="modal" value="1"><?php endif; ?>
       <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
@@ -125,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
     </form>
   </div>
-  <script>
+  <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
     (function(){
       const wrap = document.getElementById('review-stars');
       const hidden = document.getElementById('rating');

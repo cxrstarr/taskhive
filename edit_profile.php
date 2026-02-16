@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Guard: require login
 if (empty($_SESSION['user_id'])) {
@@ -32,6 +33,7 @@ function clean_text($s) {
 
 // Handle POST (update profile)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_validate()) { $errors[] = 'Security check failed.'; }
     $first_name = clean_text($_POST['first_name'] ?? '');
     $last_name  = clean_text($_POST['last_name'] ?? '');
     $email      = trim($_POST['email'] ?? '');
@@ -146,7 +148,7 @@ $currentUser = [
     <title>Edit Profile - Task Hive</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         .dropdown { display: none; opacity: 0; }
         .dropdown.active { display: block; animation: fadeIn .2s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
@@ -197,6 +199,7 @@ $currentUser = [
             <?php endif; ?>
 
             <form method="post" enctype="multipart/form-data" class="space-y-5">
+                <?= csrf_input(); ?>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -241,7 +244,7 @@ $currentUser = [
         </div>
     </main>
 
-    <script>
+    <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
         lucide.createIcons();
     </script>
 </body>

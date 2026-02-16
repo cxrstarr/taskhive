@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__.'/database.php';
 require_once __DIR__.'/flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
@@ -18,6 +19,7 @@ $userId = (int)$_SESSION['user_id'];
 
 // Handle AJAX actions (mark read, mark all read)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+  if (!csrf_validate()) { header('Content-Type: application/json'); echo json_encode(['success'=>false,'error'=>'CSRF']); exit; }
     header('Content-Type: application/json');
 
     if ($_POST['action'] === 'mark_read' && isset($_POST['conversation_id'])) {
@@ -148,7 +150,7 @@ if ($selectedId > 0) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <!-- Chat overrides -->
   <link rel="stylesheet" href="public/css/chat_overrides.css">
-   <style>
+  <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
     html, body { height: 100%; }
     body { background:#FFFBEB; }
 
@@ -286,6 +288,7 @@ if ($selectedId > 0) {
           <div class="d-flex align-items-center justify-content-between mb-2">
             <h5 class="mb-0">Inbox</h5>
             <form id="markAllForm" method="post" onsubmit="return false;">
+              <?= csrf_input(); ?>
               <button type="button" class="btn btn-sm btn-outline-secondary" id="btnMarkAll">Mark all read</button>
             </form>
           </div>
@@ -409,6 +412,7 @@ if ($selectedId > 0) {
 
             <!-- Composer -->
             <form action="send_message.php" method="POST" enctype="multipart/form-data" class="composer" id="composerForm">
+              <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
               <input type="hidden" name="conversation_id" value="<?php echo (int)$selectedId; ?>">
               <label style="cursor:pointer;" title="Attach images">
                 <input id="attachInput" type="file" name="images[]" accept="image/*" multiple style="display:none;">
@@ -431,7 +435,7 @@ if ($selectedId > 0) {
   </div>
 
   <!-- Scripts -->
-  <script>
+  <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
     // Scroll chat to bottom on load (messages area has its own scrollbar)
     (function(){
       const sc = document.getElementById('chat-scroll');
@@ -443,7 +447,8 @@ if ($selectedId > 0) {
       const btn = document.getElementById('btnMarkAll');
       if (!btn) return;
       btn.addEventListener('click', async ()=>{
-        const fd = new FormData();
+        const form = document.getElementById('markAllForm');
+        const fd = new FormData(form);
         fd.append('action','mark_all_read');
         try {
           await fetch('conversation.php', { method:'POST', body: fd });
@@ -474,7 +479,7 @@ if ($selectedId > 0) {
   <script src="public/js/chat_attach_preview.js"></script>
   <script src="public/js/chat_time.js"></script>
   <?php if ($selectedId > 0): ?>
-  <script>
+  <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
     (function(){
       const cid = <?php echo (int)$selectedId; ?>;
       const myId = <?php echo (int)$userId; ?>;
@@ -707,7 +712,7 @@ if ($selectedId > 0) {
     })();
   </script>
   <?php endif; ?>
-  <script>
+  <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
     // Autosize textarea and submit on Enter (without Shift) to retain prior behavior
     (function(){
       const ta = document.getElementById('messageBody');

@@ -22,6 +22,7 @@ require_once 'flash.php';
     </div>
     <p class="text-muted text-center">Showcase your skills & start earning.</p>
     <form method="POST" action="process_freelancer_register.php" enctype="multipart/form-data" novalidate>
+      <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
       <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label">First Name</label>

@@ -75,6 +75,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <td><?= htmlspecialchars($u['created_at']) ?></td>
         <td>
           <form method="POST" action="admin_user_action.php" class="d-inline">
+            <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
             <input type="hidden" name="user_id" value="<?= (int)$u['user_id'] ?>">
             <button class="btn btn-sm btn-danger" name="action" value="suspend">Suspend</button>
             <button class="btn btn-sm btn-warning" name="action" value="delete">Delete</button>

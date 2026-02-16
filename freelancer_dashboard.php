@@ -3,6 +3,7 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 // Require login
 if (!isset($_SESSION['user_id'])) {
@@ -16,6 +17,7 @@ $uid = (int)$_SESSION['user_id'];
 
 // Create new service handling (freelancer side)
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['new_service'])) {
+    if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: freelancer_dashboard.php'); exit; }
     $title = trim($_POST['title'] ?? '');
     $desc  = trim($_POST['description'] ?? '');
     $price = trim($_POST['base_price'] ?? '');
@@ -57,6 +59,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['new_service']
 
 // Update existing service handling (freelancer side)
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['update_service'])) {
+    if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: freelancer_dashboard.php'); exit; }
     $sid    = (int)($_POST['service_id'] ?? 0);
     $title  = trim($_POST['title'] ?? '');
     $desc   = trim($_POST['description'] ?? '');
@@ -152,6 +155,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['update_servic
 
 // Inline profile update handling (freelancer side)
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['profile_update'])) {
+    if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: freelancer_dashboard.php'); exit; }
     $first  = trim($_POST['first_name'] ?? '');
     $last   = trim($_POST['last_name'] ?? '');
     $skills = trim($_POST['skills'] ?? '');
@@ -414,7 +418,7 @@ foreach ($reviewRows as $r) {
     <title>BeeHive Dashboard - <?php echo htmlspecialchars($user['name']); ?></title>
     <link rel="stylesheet" href="dashboard.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         /* Pagination styles aligned with client dashboard */
         .pagination {
             display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 12px;
@@ -461,6 +465,7 @@ foreach ($reviewRows as $r) {
             <!-- Sidebar - Profile -->
             <aside class="sidebar">
                 <form class="profile-card" id="profileCard" method="POST" action="freelancer_dashboard.php" enctype="multipart/form-data">
+                    <?= csrf_input(); ?>
                     <input type="hidden" name="profile_update" value="1">
                     <div class="profile-header">
                         <img src="<?php echo htmlspecialchars($user['profile_picture']); ?>" 
@@ -657,6 +662,7 @@ foreach ($reviewRows as $r) {
                                             <p class="service-price">Booked on <?php echo htmlspecialchars(date('M j, Y g:i A', strtotime($b['created_at']))); ?></p>
                                             <div class="service-actions">
                                                 <form method="POST" action="booking_update.php" style="display:inline">
+                                                    <?= csrf_input(); ?>
                                                     <input type="hidden" name="booking_id" value="<?php echo (int)$b['booking_id']; ?>">
                                                     <input type="hidden" name="action" value="accept">
                                                     <input type="hidden" name="return" value="freelancer_dashboard.php">
@@ -665,6 +671,7 @@ foreach ($reviewRows as $r) {
                                                     </button>
                                                 </form>
                                                 <form method="POST" action="booking_update.php" style="display:inline">
+                                                    <?= csrf_input(); ?>
                                                     <input type="hidden" name="booking_id" value="<?php echo (int)$b['booking_id']; ?>">
                                                     <input type="hidden" name="action" value="reject">
                                                     <input type="hidden" name="return" value="freelancer_dashboard.php">
@@ -708,6 +715,7 @@ foreach ($reviewRows as $r) {
                                             <div class="service-actions">
                                                 <?php if ($bc==='accepted'): ?>
                                                     <form method="POST" action="booking_update.php" style="display:inline">
+                                                        <?= csrf_input(); ?>
                                                         <input type="hidden" name="booking_id" value="<?php echo (int)$b['booking_id']; ?>">
                                                         <input type="hidden" name="action" value="start">
                                                         <input type="hidden" name="return" value="freelancer_dashboard.php">
@@ -717,6 +725,7 @@ foreach ($reviewRows as $r) {
                                                     </form>
                                                 <?php elseif ($bc==='in_progress'): ?>
                                                     <form method="POST" action="booking_update.php" style="display:inline">
+                                                        <?= csrf_input(); ?>
                                                         <input type="hidden" name="booking_id" value="<?php echo (int)$b['booking_id']; ?>">
                                                         <input type="hidden" name="action" value="deliver">
                                                         <input type="hidden" name="return" value="freelancer_dashboard.php">
@@ -726,6 +735,7 @@ foreach ($reviewRows as $r) {
                                                     </form>
                                                 <?php elseif ($bc==='delivered'): ?>
                                                     <form method="POST" action="booking_update.php" style="display:inline">
+                                                        <?= csrf_input(); ?>
                                                         <input type="hidden" name="booking_id" value="<?php echo (int)$b['booking_id']; ?>">
                                                         <input type="hidden" name="action" value="complete">
                                                         <input type="hidden" name="return" value="freelancer_dashboard.php">
@@ -800,7 +810,7 @@ foreach ($reviewRows as $r) {
     </div>
 
     <script src="dashboard.js"></script>
-    <script>
+    <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
     // Data for services (for edit prefill)
     const SERVICES_DATA = <?php echo json_encode($services, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
     const CATEGORY_OPTIONS = <?php echo json_encode($categoryMap, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
@@ -930,6 +940,7 @@ foreach ($reviewRows as $r) {
                 </button>
             </div>
             <form id="serviceForm" method="POST" action="freelancer_dashboard.php" onsubmit="return validateService(event)">
+                <?= csrf_input(); ?>
                 <input type="hidden" name="new_service" value="1">
                 <div class="form-grid-3">
                     <div class="form-full">
@@ -994,6 +1005,7 @@ foreach ($reviewRows as $r) {
                 </button>
             </div>
             <form id="editServiceForm" method="POST" action="freelancer_dashboard.php" onsubmit="return validateEditService(event)">
+                <?= csrf_input(); ?>
                 <input type="hidden" name="update_service" value="1">
                 <input type="hidden" name="service_id" value="">
                 <div class="form-grid-3">
@@ -1040,7 +1052,7 @@ foreach ($reviewRows as $r) {
             </form>
         </div>
     </div>
-    <style>
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         /* Modal base (reuse review modal patterns) */
         .modal { display:none; position:fixed; inset:0; background: rgba(0,0,0,.55); z-index:1000; align-items:center; justify-content:center; padding:16px; }
         .modal.open { display:flex; animation: fadeIn .18s ease-out; }

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__.'/database.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 $db = new database();
 
@@ -124,6 +125,7 @@ $portfolioData = [];
 $paymentMethods = $isFreelancer ? $db->listFreelancerPaymentMethods($profileUserId, true) : [];
 // Handle "Contact Me" start chat (viewer must be logged in and not the owner)
 if ($viewerId && !$isOwner && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['start_chat_from_profile'])) {
+    if (!csrf_validate()) { header('Location: freelancer_profile.php?id='.(int)$profileUserId); exit; }
     try {
         $otherId = (int)$profileUserId;
         if ($viewerId > 0 && $otherId > 0 && $viewerId !== $otherId) {
@@ -143,6 +145,7 @@ if ($viewerId && !$isOwner && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_P
 }
 // Handle portfolio uploads (owner only)
 if ($isOwner && $isFreelancer && $_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['portfolio_upload'])) {
+    if (!csrf_validate()) { header('Location: freelancer_profile.php?id='.(int)$profileUserId); exit; }
     if (!is_dir($portfolioDir)) @mkdir($portfolioDir, 0777, true);
     // Gather portfolio meta
     $pTitle = trim($_POST['portfolio_title'] ?? '');
@@ -187,6 +190,7 @@ if ($isOwner && $isFreelancer && $_SERVER['REQUEST_METHOD']==='POST' && isset($_
 }
 // Handle portfolio manage actions (owner only): edit, archive, unarchive, delete
 if ($isOwner && $isFreelancer && $_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['portfolio_action'])) {
+    if (!csrf_validate()) { header('Location: freelancer_profile.php?id='.(int)$profileUserId); exit; }
     $action = (string)($_POST['portfolio_action'] ?? '');
     $itemId = (int)($_POST['item_id'] ?? 0);
     try {
@@ -232,6 +236,7 @@ if ($isOwner && $isFreelancer && $_SERVER['REQUEST_METHOD']==='POST' && isset($_
 }
 // Handle booking creation (client only)
 if ($viewerIsClient && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book_service'])) {
+    if (!csrf_validate()) { header('Location: freelancer_profile.php?id='.(int)$profileUserId); exit; }
     $svcId = (int)($_POST['service_id'] ?? 0);
     $qty = max(1, (int)($_POST['quantity'] ?? 1));
     $clientNotes = trim((string)($_POST['client_notes'] ?? ''));
@@ -438,7 +443,7 @@ if ($viewerId) {
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <style>
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         @keyframes slideDown {
             from { opacity: 0; transform: translateY(-10px) scale(0.95); }
             to { opacity: 1; transform: translateY(0) scale(1); }
@@ -849,6 +854,7 @@ if ($viewerId) {
                                         <?php if ($viewerId && !$isOwner): ?>
                                         <div class="flex flex-col gap-2">
                                             <form method="POST" action="freelancer_profile.php?id=<?php echo (int)$profileUserId; ?>" class="inline">
+                                                <?php echo csrf_input(); ?>
                                                 <input type="hidden" name="start_chat_from_profile" value="1" />
                                                 <button type="submit" class="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 shadow-md hover:shadow-lg transition-all">
                                                     <i data-lucide="message-circle" class="w-5 h-5"></i>
@@ -940,6 +946,7 @@ if ($viewerId) {
                                                                 <i data-lucide="pencil" class="w-3 h-3 text-amber-700"></i><span>Edit</span>
                                                             </button>
                                                             <form method="post" onsubmit="event.stopPropagation(); return confirm('Archive this portfolio item?');">
+                                                                <?php echo csrf_input(); ?>
                                                                 <input type="hidden" name="portfolio_action" value="archive" />
                                                                 <input type="hidden" name="item_id" value="<?php echo (int)$item['id']; ?>" />
                                                                 <button type="submit" class="px-2 py-1 text-xs bg-white/90 hover:bg-white rounded-md border border-amber-200 shadow-sm flex items-center gap-1 text-gray-700">
@@ -947,6 +954,7 @@ if ($viewerId) {
                                                                 </button>
                                                             </form>
                                                             <form method="post" onsubmit="event.stopPropagation(); return confirm('Permanently delete this item and its images? This cannot be undone.');">
+                                                                <?php echo csrf_input(); ?>
                                                                 <input type="hidden" name="portfolio_action" value="delete" />
                                                                 <input type="hidden" name="item_id" value="<?php echo (int)$item['id']; ?>" />
                                                                 <button type="submit" class="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md border border-red-700/20 shadow-sm flex items-center gap-1">
@@ -971,6 +979,7 @@ if ($viewerId) {
                                         </div>
                                         <?php if ($isOwner && $isFreelancer): ?>
                                         <form method="post" enctype="multipart/form-data" class="mt-6 p-4 border border-amber-200 rounded-xl bg-amber-50/30">
+                                            <?php echo csrf_input(); ?>
                                             <input type="hidden" name="portfolio_upload" value="1" />
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                                                 <div>
@@ -1000,6 +1009,7 @@ if ($viewerId) {
                                                             <img src="<?php echo htmlspecialchars($item['image']); ?>" alt="<?php echo htmlspecialchars($item['title']); ?>" class="w-full h-full object-cover grayscale">
                                                             <div class="absolute top-2 right-2 flex items-center gap-2" onclick="event.stopPropagation()">
                                                                 <form method="post" onsubmit="event.stopPropagation(); return confirm('Restore this portfolio item from archive?');">
+                                                                    <?php echo csrf_input(); ?>
                                                                     <input type="hidden" name="portfolio_action" value="unarchive" />
                                                                     <input type="hidden" name="item_id" value="<?php echo (int)$item['id']; ?>" />
                                                                     <button type="submit" class="px-2 py-1 text-xs bg-white/90 hover:bg-white rounded-md border border-amber-200 shadow-sm flex items-center gap-1 text-gray-700">
@@ -1007,6 +1017,7 @@ if ($viewerId) {
                                                                     </button>
                                                                 </form>
                                                                 <form method="post" onsubmit="event.stopPropagation(); return confirm('Permanently delete this item and its images? This cannot be undone.');">
+                                                                    <?php echo csrf_input(); ?>
                                                                     <input type="hidden" name="portfolio_action" value="delete" />
                                                                     <input type="hidden" name="item_id" value="<?php echo (int)$item['id']; ?>" />
                                                                     <button type="submit" class="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md border border-red-700/20 shadow-sm flex items-center gap-1">
@@ -1235,7 +1246,7 @@ if ($viewerId) {
         </main>
     </div>
 
-    <script>
+    <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
         lucide.createIcons();
 
         let sidebarOpen = false;
@@ -1479,6 +1490,7 @@ if ($viewerId) {
             </button>
             <h3 id="booking-modal-title" class="text-gray-900 mb-2">Book Service</h3>
             <form method="post" class="space-y-4" onsubmit="return validateBookingForm()">
+                <?php echo csrf_input(); ?>
                 <input type="hidden" name="book_service" value="1" />
                 <input type="hidden" name="service_id" id="booking-service-id" value="" />
                 <input type="hidden" id="booking-unit-price" value="0" />
@@ -1528,6 +1540,7 @@ if ($viewerId) {
             </button>
             <h3 class="text-gray-900 mb-4">Edit Portfolio Item</h3>
             <form method="post" class="space-y-4" onsubmit="return validateEditPortfolio()">
+                <?php echo csrf_input(); ?>
                 <input type="hidden" name="portfolio_action" value="edit" />
                 <input type="hidden" name="item_id" id="edit-item-id" value="" />
                 <div>
@@ -1564,7 +1577,7 @@ if ($viewerId) {
         </div>
     </div>
 
-    <script>
+    <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
         // Simple lightbox zoom/pan
         let lbScale = 1;
         // Portfolio edit helpers

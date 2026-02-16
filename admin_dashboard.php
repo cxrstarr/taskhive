@@ -2,6 +2,7 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 if (empty($_SESSION['user_id'])) { header('Location: admin_login.php'); exit; }
 $db = new database();
@@ -126,6 +127,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'booking_detail') {
     echo '<div class="text-muted mb-2">No notes yet.</div>';
   }
   echo '<form method="POST" action="admin_note_action.php" class="d-flex gap-2">';
+  echo csrf_input();
   echo   '<input type="hidden" name="target_type" value="booking">';
   echo   '<input type="hidden" name="target_id" value="'.(int)$bid.'">';
   echo   '<input type="text" name="note" class="form-control" placeholder="Add internal note…" required>';
@@ -191,6 +193,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'user_detail') {
     echo '<div class="text-muted mb-2">No notes yet.</div>';
   }
   echo '<form method="POST" action="admin_note_action.php" class="d-flex gap-2">';
+  echo csrf_input();
   echo   '<input type="hidden" name="target_type" value="user">';
   echo   '<input type="hidden" name="target_id" value="'.(int)$uid.'">';
   echo   '<input type="text" name="note" class="form-control" placeholder="Add internal note…" required>';
@@ -252,6 +255,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'service_detail') {
     echo '<div class="text-muted mb-2">No notes yet.</div>';
   }
   echo '<form method="POST" action="admin_note_action.php" class="d-flex gap-2">';
+  echo csrf_input();
   echo   '<input type="hidden" name="target_type" value="service">';
   echo   '<input type="hidden" name="target_id" value="'.(int)$sid.'">';
   echo   '<input type="text" name="note" class="form-control" placeholder="Add internal note…" required>';
@@ -298,15 +302,17 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
        . '</div></div>';
    echo '<div class="mt-3 d-flex flex-wrap gap-2">';
    if ($rid) {
-  echo '<form method="POST" action="unavail.php" class="d-inline">'
-      . '<input type="hidden" name="report_id" value="'.(int)$rid.'">'
-      . '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>'
-      . '</form>';
+  echo '<form method="POST" action="unavail.php" class="d-inline">';
+  echo csrf_input();
+  echo '<input type="hidden" name="report_id" value="'.(int)$rid.'">';
+  echo '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>';
+  echo '</form>';
    }
-   echo '<form method="POST" action="admin_user_action.php" class="d-inline">'
-     . '<input type="hidden" name="user_id" value="'.(int)$u['user_id'].'">'
-     . '<button class="btn btn-warning btn-sm" name="action" value="suspend">Suspend User</button>'
-     . '</form>';
+   echo '<form method="POST" action="admin_user_action.php" class="d-inline">';
+   echo csrf_input();
+   echo '<input type="hidden" name="user_id" value="'.(int)$u['user_id'].'">';
+   echo '<button class="btn btn-warning btn-sm" name="action" value="suspend">Suspend User</button>';
+   echo '</form>';
    echo '</div>';
     exit;
   }
@@ -327,19 +333,22 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
     echo '<div class="border rounded p-2 bg-white" style="max-height:160px;overflow:auto;white-space:pre-wrap;">'.nl2br(h($s['description'] ?? '')).'</div>';
    echo '<div class="mt-3 d-flex flex-wrap gap-2">';
    if ($rid) {
-  echo '<form method="POST" action="unavail.php" class="d-inline">'
-      . '<input type="hidden" name="report_id" value="'.(int)$rid.'">'
-      . '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>'
-      . '</form>';
+  echo '<form method="POST" action="unavail.php" class="d-inline">';
+  echo csrf_input();
+  echo '<input type="hidden" name="report_id" value="'.(int)$rid.'">';
+  echo '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>';
+  echo '</form>';
    }
-   echo '<form method="POST" action="admin_service_action.php" class="d-inline">'
-     . '<input type="hidden" name="service_id" value="'.(int)$s['service_id'].'">'
-     . '<button class="btn btn-outline-dark btn-sm" name="action" value="archive">Archive Service</button>'
-     . '</form>';
-   echo '<form method="POST" action="admin_service_action.php" class="d-inline" onsubmit="return confirm(\'Delete this service?\');">'
-     . '<input type="hidden" name="service_id" value="'.(int)$s['service_id'].'">'
-     . '<button class="btn btn-outline-danger btn-sm" name="action" value="delete">Delete Service</button>'
-     . '</form>';
+   echo '<form method="POST" action="admin_service_action.php" class="d-inline">';
+   echo csrf_input();
+   echo '<input type="hidden" name="service_id" value="'.(int)$s['service_id'].'">';
+   echo '<button class="btn btn-outline-dark btn-sm" name="action" value="archive">Archive Service</button>';
+   echo '</form>';
+   echo '<form method="POST" action="admin_service_action.php" class="d-inline" onsubmit="return confirm(\'Delete this service?\');">';
+   echo csrf_input();
+   echo '<input type="hidden" name="service_id" value="'.(int)$s['service_id'].'">';
+   echo '<button class="btn btn-outline-danger btn-sm" name="action" value="delete">Delete Service</button>';
+   echo '</form>';
    echo '</div>';
     exit;
   }
@@ -359,15 +368,17 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
     }
     echo '<div class="mt-3 d-flex flex-wrap gap-2">';
     if ($rid) {
-  echo '<form method="POST" action="unavail.php" class="d-inline">'
-         . '<input type="hidden" name="report_id" value="'.(int)$rid.'">'
-         . '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>'
-         . '</form>';
+  echo '<form method="POST" action="unavail.php" class="d-inline">';
+  echo csrf_input();
+  echo '<input type="hidden" name="report_id" value="'.(int)$rid.'">';
+  echo '<button class="btn btn-success btn-sm" name="action" value="resolve">Resolve Report</button>';
+  echo '</form>';
     }
-    echo '<form method="POST" action="admin_review_action.php" class="d-inline" onsubmit="return confirm(\'Delete this review?\');">'
-       . '<input type="hidden" name="review_id" value="'.(int)$r['review_id'].'">'
-       . '<button class="btn btn-outline-danger btn-sm" name="action" value="delete">Delete Review</button>'
-       . '</form>';
+    echo '<form method="POST" action="admin_review_action.php" class="d-inline" onsubmit="return confirm(\'Delete this review?\');">';
+    echo csrf_input();
+    echo '<input type="hidden" name="review_id" value="'.(int)$r['review_id'].'">';
+    echo '<button class="btn btn-outline-danger btn-sm" name="action" value="delete">Delete Review</button>';
+    echo '</form>';
     echo '</div>';
     exit;
   }
@@ -386,7 +397,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'report_target') {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <style>
+  <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
     :root{
       /* Tweak these if you want more/less centering */
       --content-max: 1280px;    /* max width of the main content */
@@ -665,7 +676,7 @@ switch ($view) {
         </div>
       </div>
 
-      <script>
+      <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
         document.addEventListener('DOMContentLoaded', function(){
           var modalEl = document.getElementById('userDetailModal');
           if (!modalEl) return;
@@ -765,7 +776,7 @@ switch ($view) {
         </div>
       </div>
 
-      <script>
+      <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
         document.addEventListener('DOMContentLoaded', function(){
           var modalEl = document.getElementById('serviceDetailModal');
           if (!modalEl) return;
@@ -837,6 +848,7 @@ switch ($view) {
           <a class="btn btn-sm btn-outline-dark" href="admin_service_inspect.php?service_id=<?= isset($pendingServices[0]['service_id']) ? (int)$pendingServices[0]['service_id'] : 0 ?>" <?= empty($pendingServices)?'style="pointer-events:none;opacity:.5"':''; ?>>Open First Pending</a>
           <!-- Bulk actions toolbar -->
           <form id="bulkActionsForm" class="d-flex align-items-center gap-2 ms-auto" method="POST" action="admin_service_action.php" onsubmit="return confirmBulk(event);">
+            <?= csrf_input(); ?>
             <input type="hidden" name="action" id="bulkActionInput" value="">
             <input type="hidden" name="reason" id="bulkReasonInput" value="">
             <div class="btn-group btn-group-sm" role="group" aria-label="Bulk actions">
@@ -916,11 +928,13 @@ switch ($view) {
                       <a class="btn btn-outline-secondary btn-sm" href="admin_service_inspect.php?service_id=<?= (int)$s['service_id'] ?>" target="_blank">Inspect</a>
 
                       <form method="POST" action="admin_service_action.php" class="d-inline">
+                        <?= csrf_input(); ?>
                         <input type="hidden" name="service_id" value="<?= (int)$s['service_id'] ?>">
                         <button class="btn btn-success btn-sm" name="action" value="approve">Approve</button>
                       </form>
 
                       <form method="POST" action="admin_service_action.php" class="d-inline">
+                        <?= csrf_input(); ?>
                         <input type="hidden" name="service_id" value="<?= (int)$s['service_id'] ?>">
                         <div class="input-group input-group-sm" style="max-width: 460px;">
                           <select class="form-select" onchange="this.nextElementSibling.value=this.value || this.nextElementSibling.value">
@@ -936,6 +950,7 @@ switch ($view) {
 
                       <?php if (isset($s['flagged'])): ?>
                         <form method="POST" action="admin_service_action.php" class="d-inline">
+                          <?= csrf_input(); ?>
                           <input type="hidden" name="service_id" value="<?= (int)$s['service_id'] ?>">
                           <div class="input-group input-group-sm" style="max-width: 380px;">
                             <input type="text" name="reason" class="form-control" placeholder="Flag reason (optional)">
@@ -943,17 +958,20 @@ switch ($view) {
                           </div>
                         </form>
                         <form method="POST" action="admin_service_action.php" class="d-inline">
+                          <?= csrf_input(); ?>
                           <input type="hidden" name="service_id" value="<?= (int)$s['service_id'] ?>">
                           <button class="btn btn-outline-secondary btn-sm" name="action" value="unflag">Unflag</button>
                         </form>
                       <?php endif; ?>
 
                       <form method="POST" action="admin_service_action.php" class="d-inline" onsubmit="return confirm('Archive this service?');">
+                        <?= csrf_input(); ?>
                         <input type="hidden" name="service_id" value="<?= (int)$s['service_id'] ?>">
                         <button class="btn btn-outline-dark btn-sm" name="action" value="archive">Archive</button>
                       </form>
 
                       <form method="POST" action="admin_service_action.php" class="d-inline" onsubmit="return confirm('Delete this service permanently?');">
+                        <?= csrf_input(); ?>
                         <input type="hidden" name="service_id" value="<?= (int)$s['service_id'] ?>">
                         <button class="btn btn-outline-danger btn-sm" name="action" value="delete">Delete</button>
                       </form>
@@ -966,7 +984,7 @@ switch ($view) {
             <div class="col-12"><div class="alert alert-light border">No services awaiting approval.</div></div>
           <?php endif; ?>
         </div>
-        <script>
+        <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
           // Simple client-side filter on title, freelancer, category
           (function(){
             var input = document.getElementById('svcFilter');
@@ -1051,6 +1069,7 @@ switch ($view) {
                 <?= h($s['title']) ?> (ID <?= (int)$s['service_id'] ?>)
                 <a href="admin_service_inspect.php?service_id=<?= (int)$s['service_id'] ?>" class="ms-2">View</a>
                 <form method="POST" action="admin_service_action.php" class="d-inline ms-2">
+                  <?= csrf_input(); ?>
                   <input type="hidden" name="service_id" value="<?= (int)$s['service_id'] ?>">
                   <button class="btn btn-sm btn-success" name="action" value="approve">Approve</button>
                   <div class="input-group input-group-sm ms-2" style="max-width:420px; display:inline-flex; vertical-align:middle;">
@@ -1069,7 +1088,7 @@ switch ($view) {
             <?php if (!$pendingServices): ?><li class="text-muted">No services awaiting approval.</li><?php endif; ?>
           </ul>
         </div>
-        <script>
+        <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
           // In compact view, the header bulk toolbar is reused; no duplicate toolbar here.
         </script>
       <?php endif; ?>
@@ -1084,6 +1103,7 @@ switch ($view) {
             </div>
             <div class="modal-body">
               <form method="POST" action="admin_rejection_reason_action.php" class="d-flex gap-2 mb-3">
+                <?= csrf_input(); ?>
                 <input type="hidden" name="action" value="add">
                 <input type="text" class="form-control" name="label" placeholder="Add new reason…" required>
                 <button class="btn btn-primary">Add</button>
@@ -1093,6 +1113,7 @@ switch ($view) {
                   <li class="list-group-item d-flex justify-content-between align-items-center">
                     <span><?= h($rr['label']) ?></span>
                     <form method="POST" action="admin_rejection_reason_action.php" onsubmit="return confirm('Delete this reason?');" class="ms-2">
+                      <?= csrf_input(); ?>
                       <input type="hidden" name="action" value="delete">
                       <input type="hidden" name="reason_id" value="<?= (int)$rr['reason_id'] ?>">
                       <button class="btn btn-sm btn-outline-danger">Delete</button>
@@ -1318,7 +1339,7 @@ switch ($view) {
         </div>
       </div>
 
-      <script>
+      <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
         document.addEventListener('DOMContentLoaded', function(){
           var modalEl = document.getElementById('bookingDetailModal');
           if (!modalEl) return;
@@ -1822,7 +1843,7 @@ switch ($view) {
         <div class="col-md-6"><div class="card p-3"><h6>Revenue (last 12)</h6><canvas id="revenueChart"></canvas></div></div>
       </div>
       <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-      <script>
+      <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
         const bLabels = <?= json_encode($labelsA) ?>;
         const bData = <?= json_encode($dataA) ?>;
         const rLabels = <?= json_encode($labelsB) ?>;

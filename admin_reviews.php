@@ -85,6 +85,7 @@ $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <td><?= nl2br(htmlspecialchars($r['reply'] ?? '')) ?></td>
         <td>
           <form method="POST" action="admin_review_action.php" class="d-inline">
+            <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
             <input type="hidden" name="review_id" value="<?= (int)$r['review_id'] ?>">
             <button class="btn btn-sm btn-danger" name="action" value="delete">Delete</button>
           </form>

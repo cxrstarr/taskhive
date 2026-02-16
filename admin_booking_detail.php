@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'database.php';
+require_once __DIR__ . '/includes/csrf.php';
 if (empty($_SESSION['user_id'])) { header('Location: admin_login.php'); exit; }
 $db = new database();
 $user = $db->getUser((int)$_SESSION['user_id']);
@@ -44,6 +45,7 @@ $messages = $db->opencon()->query("SELECT * FROM messages WHERE booking_id=$book
     <div>Reason: <?= htmlspecialchars($dispute['reason_code']) ?></div>
     <div>Description: <?= htmlspecialchars($dispute['description']) ?></div>
   <form method="POST" action="unavail.php">
+      <?= csrf_input(); ?>
       <input type="hidden" name="dispute_id" value="<?= (int)$dispute['dispute_id'] ?>">
       <input type="text" name="resolution" placeholder="Resolution notes" class="form-control mb-2" />
       <button class="btn btn-success" name="action" value="resolve">Resolve</button>

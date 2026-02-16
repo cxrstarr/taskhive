@@ -30,6 +30,7 @@ $flaggedServices = $db->opencon()->query("SELECT * FROM services WHERE flagged=1
     <?php foreach ($pendingServices as $s): ?>
       <li><?= htmlspecialchars($s['title']) ?> by <?= $s['freelancer_id'] ?> 
         <form method="POST" action="admin_service_action.php" class="d-inline">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="service_id" value="<?= (int)$s['service_id'] ?>">
           <button class="btn btn-sm btn-success" name="action" value="approve">Approve</button>
           <button class="btn btn-sm btn-danger" name="action" value="reject">Reject</button>

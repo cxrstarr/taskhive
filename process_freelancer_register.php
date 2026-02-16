@@ -2,10 +2,12 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: freelancer.php"); exit;
 }
+if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: freelancer.php'); exit; }
 
 $first = trim($_POST['first_name']??'');
 $last  = trim($_POST['last_name']??'');

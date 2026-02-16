@@ -45,7 +45,7 @@ if (($public['user_type'] ?? '') === 'freelancer' && !empty($public['skills'])) 
   <title><?= htmlspecialchars($public['first_name'].' '.$public['last_name']); ?> - Profile</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <style>
+  <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
     body { background:#fafafa; }
     .profile-wrapper { max-width:1100px; margin:auto; }
     .avatar { width:140px;height:140px;object-fit:cover; }
@@ -58,6 +58,7 @@ if (($public['user_type'] ?? '') === 'freelancer' && !empty($public['skills'])) 
     <div class="d-flex gap-2">
       <?php if ($canMessage): ?>
         <form method="POST" action="start_conversation.php" class="d-inline">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="target_user_id" value="<?= (int)$public['user_id']; ?>">
           <button class="btn btn-sm btn-primary">Message</button>
         </form>
@@ -144,6 +145,7 @@ if (($public['user_type'] ?? '') === 'freelancer' && !empty($public['skills'])) 
             <div class="mb-1"><?= nl2br(htmlspecialchars($rv['comment'] ?? '')); ?></div>
             <?php if ($viewer_id): ?>
               <form method="POST" action="report_action.php" class="d-inline" onsubmit="return confirm('Report this review to moderators?');">
+                <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
                 <input type="hidden" name="report_type" value="review">
                 <input type="hidden" name="target_id" value="<?= (int)$rv['review_id'] ?>">
                 <input type="hidden" name="return" value="<?= 'user_profile.php?id='.(int)$public['user_id'] ?>">
@@ -165,6 +167,7 @@ if (($public['user_type'] ?? '') === 'freelancer' && !empty($public['skills'])) 
 <div class="modal fade" id="reportUserModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form class="modal-content" method="POST" action="report_action.php">
+      <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
       <div class="modal-header">
         <h5 class="modal-title">Report User</h5>
         <button class="btn-close" data-bs-dismiss="modal" type="button"></button>

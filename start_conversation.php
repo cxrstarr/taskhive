@@ -2,10 +2,12 @@
 session_start();
 require_once 'database.php';
 require_once 'flash.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: index.php"); exit;
 }
+if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: index.php'); exit; }
 if (empty($_SESSION['user_id'])) {
     flash_set('error','Login required.');
     header("Location: login.php"); exit;

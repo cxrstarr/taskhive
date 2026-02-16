@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/includes/csrf.php';
 
 // Ensure logged in
 if (!isset($_SESSION['user_id'])) {
@@ -25,6 +26,10 @@ $userId = (int)$_SESSION['user_id'];
 $conversationId = isset($_POST['conversation_id']) ? (int)$_POST['conversation_id'] : 0;
 $body = isset($_POST['body']) ? trim((string)$_POST['body']) : '';
 
+if (!csrf_validate()) {
+    header('Location: conversation.php');
+    exit();
+}
 if ($conversationId <= 0) {
     header('Location: conversation.php');
     exit();

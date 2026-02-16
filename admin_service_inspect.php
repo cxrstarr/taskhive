@@ -81,7 +81,7 @@ $flagAt = $hasFlagCols ? ($svc['flagged_at'] ?? null) : null;
   <title>Admin • Service #<?= (int)$service_id ?> Inspect</title>
   <link rel="stylesheet" href="public/css/admin_theme.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
+  <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
     .meta-badge { font-size: .82rem; }
     .thumb { width: 110px; height: 80px; object-fit: cover; border-radius: 8px; border:1px solid #e6e6ea; }
     .grid { display:flex; flex-wrap:wrap; gap:10px; }
@@ -234,11 +234,13 @@ $flagAt = $hasFlagCols ? ($svc['flagged_at'] ?? null) : null;
       <h6>Admin Actions</h6>
       <div class="d-flex flex-wrap gap-2 align-items-end">
         <form method="POST" action="admin_service_action.php" class="d-inline">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="service_id" value="<?= (int)$service_id ?>">
           <button class="btn btn-success" name="action" value="approve">Approve</button>
         </form>
 
         <form method="POST" action="admin_service_action.php" class="d-inline">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="service_id" value="<?= (int)$service_id ?>">
           <div class="input-group">
             <input type="text" name="reason" class="form-control form-control-sm" placeholder="Rejection reason (optional)">
@@ -248,6 +250,7 @@ $flagAt = $hasFlagCols ? ($svc['flagged_at'] ?? null) : null;
 
         <?php if ($hasFlagCols): ?>
         <form method="POST" action="admin_service_action.php" class="d-inline">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="service_id" value="<?= (int)$service_id ?>">
           <div class="input-group">
             <input type="text" name="reason" class="form-control form-control-sm" placeholder="Flag reason (optional)">
@@ -255,17 +258,20 @@ $flagAt = $hasFlagCols ? ($svc['flagged_at'] ?? null) : null;
           </div>
         </form>
         <form method="POST" action="admin_service_action.php" class="d-inline">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="service_id" value="<?= (int)$service_id ?>">
           <button class="btn btn-outline-secondary" name="action" value="unflag">Unflag</button>
         </form>
         <?php endif; ?>
 
         <form method="POST" action="admin_service_action.php" class="d-inline" onsubmit="return confirm('Archive this service?');">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="service_id" value="<?= (int)$service_id ?>">
           <button class="btn btn-outline-dark" name="action" value="archive">Archive</button>
         </form>
 
         <form method="POST" action="admin_service_action.php" class="d-inline" onsubmit="return confirm('Delete this service permanently? This cannot be undone.');">
+          <?php require_once __DIR__ . '/includes/csrf.php'; echo csrf_input(); ?>
           <input type="hidden" name="service_id" value="<?= (int)$service_id ?>">
           <button class="btn btn-outline-danger" name="action" value="delete">Delete</button>
         </form>

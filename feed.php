@@ -256,7 +256,7 @@ $categories = array_merge(['All'], $categoryList);
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <style>
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         /* Custom Animations */
         @keyframes slideDown {
             from {
@@ -848,7 +848,7 @@ $categories = array_merge(['All'], $categoryList);
         <input type="hidden" name="freelancer_id" id="bfff-freelancer-id" value="" />
     </form>
 
-    <script>
+    <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
     // Initialize Lucide Icons
     lucide.createIcons();
 

@@ -134,7 +134,7 @@ unset($_SESSION['registration_errors']);
     <title>Join BeeHive - Freelancer Registration</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
+    <style <?= function_exists('csp_style_nonce_attr') ? csp_style_nonce_attr() : '' ?> >
         * {
             margin: 0;
             padding: 0;

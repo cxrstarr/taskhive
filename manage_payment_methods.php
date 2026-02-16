@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 function ensure_logged_in_freelancer(): array {
     if (empty($_SESSION['user_id'])) {
@@ -37,6 +38,7 @@ $db   = new database();
 $task = $_POST['task'] ?? $_GET['task'] ?? '';
 
 if ($task === 'add' && $_SERVER['REQUEST_METHOD']==='POST') {
+  if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: manage_payment_methods.php'); exit; }
     $method_type    = $_POST['method_type'] ?? '';
     $display_label  = trim($_POST['display_label'] ?? '');
     $account_name   = trim($_POST['account_name'] ?? '');
@@ -92,6 +94,7 @@ if ($task === 'add' && $_SERVER['REQUEST_METHOD']==='POST') {
 }
 
 if ($task === 'toggle' && $_SERVER['REQUEST_METHOD']==='POST') {
+  if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: manage_payment_methods.php'); exit; }
     $method_id = (int)($_POST['method_id'] ?? 0);
     $row = $db->getFreelancerPaymentMethod($method_id, $user['user_id']);
     if (!$row) {
@@ -107,6 +110,7 @@ if ($task === 'toggle' && $_SERVER['REQUEST_METHOD']==='POST') {
 }
 
 if ($task === 'delete' && $_SERVER['REQUEST_METHOD']==='POST') {
+  if (!csrf_validate()) { flash_set('error','Security check failed.'); header('Location: manage_payment_methods.php'); exit; }
     $method_id = (int)($_POST['method_id'] ?? 0);
     $row = $db->getFreelancerPaymentMethod($method_id, $user['user_id']);
     if (!$row) {
@@ -144,6 +148,7 @@ $methods = $db->listFreelancerPaymentMethods($user['user_id'], false);
     <div class="card-header">Add New Method</div>
     <div class="card-body">
       <form method="POST" enctype="multipart/form-data" class="row g-3">
+        <?= csrf_input(); ?>
         <input type="hidden" name="task" value="add">
         <div class="col-md-3">
           <label class="form-label">Type</label>
@@ -208,6 +213,7 @@ $methods = $db->listFreelancerPaymentMethods($user['user_id'], false);
                 </div>
                 <div class="d-flex gap-2 mt-3">
                   <form method="POST" onsubmit="return confirm('Toggle active state for this method?');">
+                    <?= csrf_input(); ?>
                     <input type="hidden" name="task" value="toggle">
                     <input type="hidden" name="method_id" value="<?= (int)$m['method_id'] ?>">
                     <button class="btn btn-sm <?= $m['is_active']?'btn-outline-secondary':'btn-outline-success' ?>">
@@ -215,6 +221,7 @@ $methods = $db->listFreelancerPaymentMethods($user['user_id'], false);
                     </button>
                   </form>
                   <form method="POST" onsubmit="return confirm('Delete this method?');">
+                    <?= csrf_input(); ?>
                     <input type="hidden" name="task" value="delete">
                     <input type="hidden" name="method_id" value="<?= (int)$m['method_id'] ?>">
                     <button class="btn btn-sm btn-outline-danger">Delete</button>
