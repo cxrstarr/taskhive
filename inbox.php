@@ -969,7 +969,7 @@ try {
                 </div>
             </div>
 
-    <script>
+    <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
         lucide.createIcons();
 
     let sidebarOpen = false;
@@ -977,10 +977,34 @@ try {
     let currentMessageId = <?php echo $hasConv ? (int)$firstConvId : 0; ?>;
         let isStarred = false;
 
+        function escapeHtml(input) {
+            const s = String(input ?? '');
+            return s
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        function escapeAttr(input) {
+            return escapeHtml(input);
+        }
+        function safeSameOriginUrl(input) {
+            const raw = String(input ?? '').trim();
+            if (!raw) return '';
+            if (raw.startsWith('img/') || raw.startsWith('uploads/') || raw.startsWith('public/') || raw.startsWith('/')) return raw;
+            try {
+                const u = new URL(raw, window.location.origin);
+                if (u.origin === window.location.origin) return u.pathname + u.search + u.hash;
+                if (u.origin === 'https://api.dicebear.com') return u.href;
+            } catch (_) {}
+            return '';
+        }
+
     // Conversations data from PHP
-        const conversations = <?php echo json_encode($conversations); ?>;
-    const currentUserAvatar = '<?php echo htmlspecialchars($currentUser['avatar']); ?>';
-    const CURRENT_USER_TYPE = '<?php echo htmlspecialchars($userType); ?>';
+        const conversations = <?php echo json_encode($conversations, JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const currentUserAvatar = <?php echo json_encode((string)($currentUser['avatar'] ?? ''), JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
+    const CURRENT_USER_TYPE = <?php echo json_encode((string)($userType ?? ''), JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;
     // Server timezone offset (e.g., +08:00) so we can interpret naive timestamps correctly
     const SERVER_TZ_OFFSET = '<?php echo date('P'); ?>';
     const messageListEl = document.getElementById('message-list');
@@ -1127,8 +1151,8 @@ try {
                 bubble.innerHTML = `
                     <div class="max-w-2xl px-4 py-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-full shadow-sm flex items-center gap-2">
                         <i data-lucide="info" class="w-4 h-4 text-amber-600"></i>
-                        <span class="leading-relaxed text-sm">${msg.content || ''}</span>
-                        <span class="msg-time text-xs text-amber-700/80 ml-2" data-ts="${msg.ts || ''}"></span>
+                        <span class="leading-relaxed text-sm">${escapeHtml(msg.content || '')}</span>
+                        <span class="msg-time text-xs text-amber-700/80 ml-2" data-ts="${escapeAttr(msg.ts || '')}"></span>
                     </div>`;
                 return bubble;
             }
@@ -1138,22 +1162,31 @@ try {
             const attachmentsHtml = (msg.attachments && Array.isArray(msg.attachments))
                 ? msg.attachments.map(att => {
                     if (att.type === 'image') {
-                        return `<div class="mt-2"><img src="${att.url}" alt="attachment" class="chat-image max-w-xs rounded-lg border border-amber-200 cursor-zoom-in" data-full="${att.url}"></div>`;
+                        const safe = safeSameOriginUrl(att.url);
+                        if (!safe) return '';
+                        const src = escapeAttr(safe);
+                        return `<div class="mt-2"><img src="${src}" alt="attachment" class="chat-image max-w-xs rounded-lg border border-amber-200 cursor-zoom-in" data-full="${src}"></div>`;
                     }
                     return '';
                 }).join('')
                 : '';
 
+            const avatarUrl = safeSameOriginUrl(msg.isCurrentUser ? currentUserAvatar : conv.sender_avatar) || 'img/profile_icon.webp';
+            const safeAlt = escapeAttr(msg.sender || '');
+            const senderName = escapeHtml(msg.sender || '');
+            const safeTs = escapeAttr(msg.ts || '');
+            const contentHtml = msg.content ? `<p class="leading-relaxed">${escapeHtml(msg.content)}</p>` : '';
+
             bubble.innerHTML = `
-                <img src="${msg.isCurrentUser ? currentUserAvatar : conv.sender_avatar}" alt="${msg.sender}" class="w-10 h-10 rounded-full border-2 border-amber-400 object-cover flex-shrink-0">
+                <img src="${escapeAttr(avatarUrl)}" alt="${safeAlt}" class="w-10 h-10 rounded-full border-2 border-amber-400 object-cover flex-shrink-0">
                 <div class="flex-1 max-w-2xl ${msg.isCurrentUser ? 'flex flex-col items-end' : ''}">
                     <div class="flex items-center gap-2 mb-2 ${msg.isCurrentUser ? 'flex-row-reverse' : ''}">
-                        <span class="text-sm font-medium text-gray-900">${msg.sender}</span>
-                        <span class="msg-time text-xs text-gray-500" data-ts="${msg.ts || ''}"></span>
+                        <span class="text-sm font-medium text-gray-900">${senderName}</span>
+                        <span class="msg-time text-xs text-gray-500" data-ts="${safeTs}"></span>
                         ${msg.isCurrentUser ? '<i data-lucide="check-check" class="w-4 h-4 text-blue-500"></i>' : ''}
                     </div>
                     <div class="p-4 ${msg.isCurrentUser ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white' : 'bg-white border border-amber-200 text-gray-800'} rounded-2xl shadow-sm hover:scale-[1.01] transition-transform">
-                        ${msg.content ? `<p class="leading-relaxed">${msg.content}</p>` : ''}
+                        ${contentHtml}
                         ${attachmentsHtml}
                     </div>
                 </div>`;
@@ -1167,7 +1200,7 @@ try {
             if (!conv) return;
             
             // Update header
-            document.getElementById('message-view-avatar').src = conv.sender_avatar;
+            document.getElementById('message-view-avatar').src = safeSameOriginUrl(conv.sender_avatar) || 'img/profile_icon.webp';
             document.getElementById('message-view-subject').textContent = conv.subject;
             document.getElementById('message-view-sender').textContent = conv.sender;
             const headerTimeEl = document.getElementById('message-view-time');

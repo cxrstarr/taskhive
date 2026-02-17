@@ -1301,17 +1301,27 @@ unset($_SESSION['registration_errors']);
         });
 
         function renderSkills() {
-            skillsTags.innerHTML = '';
+            skillsTags.textContent = '';
             skills.forEach((skill, index) => {
                 const tag = document.createElement('div');
                 tag.className = 'skill-tag';
-                tag.innerHTML = `
-                    <i class="fas fa-sparkles"></i>
-                    ${skill}
-                    <button type="button" onclick="removeSkill(${index})">
-                        <i class="fas fa-times"></i>
-                    </button>
-                `;
+
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-sparkles';
+                tag.appendChild(icon);
+
+                const txt = document.createElement('span');
+                txt.textContent = String(skill);
+                tag.appendChild(txt);
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.addEventListener('click', function(){ removeSkill(index); });
+                const x = document.createElement('i');
+                x.className = 'fas fa-times';
+                btn.appendChild(x);
+                tag.appendChild(btn);
+
                 skillsTags.appendChild(tag);
             });
         }

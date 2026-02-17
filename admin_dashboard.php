@@ -677,6 +677,25 @@ switch ($view) {
       </div>
 
       <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
+        function taskhiveSanitizeHtml(html) {
+          try {
+            var doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+            doc.querySelectorAll('script, iframe, object, embed, link[rel="import"], base').forEach(function(n){ n.remove(); });
+            doc.querySelectorAll('*').forEach(function(el){
+              // Strip inline event handlers and dangerous URLs
+              Array.prototype.slice.call(el.attributes || []).forEach(function(a){
+                var name = String(a.name || '').toLowerCase();
+                var val  = String(a.value || '');
+                if (name.startsWith('on')) el.removeAttribute(a.name);
+                if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(val)) el.removeAttribute(a.name);
+                if (name === 'srcdoc') el.removeAttribute(a.name);
+              });
+            });
+            return doc.body ? doc.body.innerHTML : '';
+          } catch (e) {
+            return '';
+          }
+        }
         document.addEventListener('DOMContentLoaded', function(){
           var modalEl = document.getElementById('userDetailModal');
           if (!modalEl) return;
@@ -688,7 +707,7 @@ switch ($view) {
             if (!uid) { body.textContent = 'Missing user id.'; return; }
             fetch('?view=users&ajax=user_detail&user_id=' + encodeURIComponent(uid), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
               .then(function(r){ return r.text(); })
-              .then(function(html){ body.innerHTML = html; })
+              .then(function(html){ body.innerHTML = taskhiveSanitizeHtml(html); })
               .catch(function(){ body.innerHTML = '<div class="text-danger">Failed to load user details.</div>'; });
           });
         });
@@ -777,6 +796,24 @@ switch ($view) {
       </div>
 
       <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
+        function taskhiveSanitizeHtml(html) {
+          try {
+            var doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+            doc.querySelectorAll('script, iframe, object, embed, link[rel="import"], base').forEach(function(n){ n.remove(); });
+            doc.querySelectorAll('*').forEach(function(el){
+              Array.prototype.slice.call(el.attributes || []).forEach(function(a){
+                var name = String(a.name || '').toLowerCase();
+                var val  = String(a.value || '');
+                if (name.startsWith('on')) el.removeAttribute(a.name);
+                if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(val)) el.removeAttribute(a.name);
+                if (name === 'srcdoc') el.removeAttribute(a.name);
+              });
+            });
+            return doc.body ? doc.body.innerHTML : '';
+          } catch (e) {
+            return '';
+          }
+        }
         document.addEventListener('DOMContentLoaded', function(){
           var modalEl = document.getElementById('serviceDetailModal');
           if (!modalEl) return;
@@ -788,7 +825,7 @@ switch ($view) {
             if (!sid) { body.textContent = 'Missing service id.'; return; }
             fetch('?view=services&ajax=service_detail&service_id=' + encodeURIComponent(sid), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
               .then(function(r){ return r.text(); })
-              .then(function(html){ body.innerHTML = html; })
+              .then(function(html){ body.innerHTML = taskhiveSanitizeHtml(html); })
               .catch(function(){ body.innerHTML = '<div class="text-danger">Failed to load service details.</div>'; });
           });
         });
@@ -1340,6 +1377,28 @@ switch ($view) {
       </div>
 
       <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
+        (function(){
+          if (typeof window.taskhiveSanitizeHtml !== 'function') {
+            window.taskhiveSanitizeHtml = function(html) {
+              try {
+                var doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+                doc.querySelectorAll('script, iframe, object, embed, link[rel="import"], base').forEach(function(n){ n.remove(); });
+                doc.querySelectorAll('*').forEach(function(el){
+                  Array.prototype.slice.call(el.attributes || []).forEach(function(a){
+                    var name = String(a.name || '').toLowerCase();
+                    var val  = String(a.value || '');
+                    if (name.startsWith('on')) el.removeAttribute(a.name);
+                    if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(val)) el.removeAttribute(a.name);
+                    if (name === 'srcdoc') el.removeAttribute(a.name);
+                  });
+                });
+                return doc.body ? doc.body.innerHTML : '';
+              } catch (e) {
+                return '';
+              }
+            };
+          }
+        })();
         document.addEventListener('DOMContentLoaded', function(){
           var modalEl = document.getElementById('bookingDetailModal');
           if (!modalEl) return;
@@ -1351,7 +1410,7 @@ switch ($view) {
             if (!bid) { body.textContent = 'Missing booking id.'; return; }
             fetch('?view=bookings&ajax=booking_detail&booking_id=' + encodeURIComponent(bid), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
               .then(function(r){ return r.text(); })
-              .then(function(html){ body.innerHTML = html; })
+              .then(function(html){ body.innerHTML = window.taskhiveSanitizeHtml(html); })
               .catch(function(){ body.innerHTML = '<div class="text-danger">Failed to load booking details.</div>'; });
           });
         });
@@ -1912,7 +1971,29 @@ switch ($view) {
           </div>
         </div>
       </div>
-      <script>
+      <script <?= function_exists('csp_script_nonce_attr') ? csp_script_nonce_attr() : '' ?> >
+        (function(){
+          if (typeof window.taskhiveSanitizeHtml !== 'function') {
+            window.taskhiveSanitizeHtml = function(html) {
+              try {
+                var doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+                doc.querySelectorAll('script, iframe, object, embed, link[rel="import"], base').forEach(function(n){ n.remove(); });
+                doc.querySelectorAll('*').forEach(function(el){
+                  Array.prototype.slice.call(el.attributes || []).forEach(function(a){
+                    var name = String(a.name || '').toLowerCase();
+                    var val  = String(a.value || '');
+                    if (name.startsWith('on')) el.removeAttribute(a.name);
+                    if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(val)) el.removeAttribute(a.name);
+                    if (name === 'srcdoc') el.removeAttribute(a.name);
+                  });
+                });
+                return doc.body ? doc.body.innerHTML : '';
+              } catch (e) {
+                return '';
+              }
+            };
+          }
+        })();
         document.addEventListener('DOMContentLoaded', function(){
           var modalEl = document.getElementById('reportTargetModal');
           if (!modalEl) return;
@@ -1926,7 +2007,7 @@ switch ($view) {
             if (!rid || !ttype || !tid) { body.textContent = 'Missing report context.'; return; }
             fetch('?view=reports&ajax=report_target&report_id=' + encodeURIComponent(rid) + '&target_type=' + encodeURIComponent(ttype) + '&target_id=' + encodeURIComponent(tid), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
               .then(function(r){ return r.text(); })
-              .then(function(html){ body.innerHTML = html; })
+              .then(function(html){ body.innerHTML = window.taskhiveSanitizeHtml(html); })
               .catch(function(){ body.innerHTML = '<div class="text-danger">Failed to load reported item.</div>'; });
           });
         });

@@ -1212,10 +1212,27 @@ $categories = array_merge(['All'], $categoryList);
                                         starHtml += '<i data-lucide="star" class="w-3.5 h-3.5 text-gray-300"></i>';
                                     }
                                 }
-                                head.innerHTML = '<i data-lucide="quote" class="w-4 h-4"></i>' +
-                                                 '<span class="inline-flex items-center gap-1">' + starHtml + '</span>' +
-                                                 '<span class="text-gray-700">·</span>' +
-                                                 '<span class="text-gray-700">' + (r.reviewer_name || 'User') + '</span>';
+                                // Avoid DOM XSS: build nodes and use textContent for any user-provided text.
+                                head.textContent = '';
+                                const q = document.createElement('i');
+                                q.setAttribute('data-lucide', 'quote');
+                                q.className = 'w-4 h-4';
+                                head.appendChild(q);
+
+                                const stars = document.createElement('span');
+                                stars.className = 'inline-flex items-center gap-1';
+                                stars.innerHTML = starHtml;
+                                head.appendChild(stars);
+
+                                const dot = document.createElement('span');
+                                dot.className = 'text-gray-700';
+                                dot.textContent = '·';
+                                head.appendChild(dot);
+
+                                const nm = document.createElement('span');
+                                nm.className = 'text-gray-700';
+                                nm.textContent = (r.reviewer_name || 'User');
+                                head.appendChild(nm);
                                 wrap.appendChild(head);
                                 if (r.comment) {
                                     const p = document.createElement('p');
